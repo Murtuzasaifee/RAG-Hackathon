@@ -3,8 +3,9 @@ from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
+from pydantic_settings import SettingsConfigDict
 
-from rag_hackathon.core.settings import Settings, get_settings
+from rag_hackathon.core.settings import Settings
 
 REQUIRED_ENV = {
     "AZURE_DI_ENDPOINT": "https://example.cognitiveservices.azure.com",
@@ -15,11 +16,17 @@ REQUIRED_ENV = {
 }
 
 
+class _IsolatedSettings(Settings):
+    model_config = SettingsConfigDict(
+        env_file=None,
+        extra="ignore",
+    )
+
+
 def _make_settings(**overrides: str) -> Settings:
     env = {**REQUIRED_ENV, **overrides}
-    with patch.dict(os.environ, env, clear=False):
-        get_settings.cache_clear()
-        return get_settings()
+    with patch.dict(os.environ, env, clear=True):
+        return _IsolatedSettings()
 
 
 def test_settings_loads_from_env():
@@ -37,6 +44,7 @@ def test_settings_defaults():
     assert s.chunk_max_tokens == 512
     assert s.cache_ttl_embed == 86400
     assert s.bifrost_url == "http://localhost:8080"
+    assert s.llm_model == "gpt-5.4"
 
 
 def test_settings_numeric_env_parsed_as_int():
@@ -46,10 +54,8 @@ def test_settings_numeric_env_parsed_as_int():
 
 
 def test_settings_missing_required_raises():
-    with patch.dict(os.environ, {}, clear=True):
-        get_settings.cache_clear()
-        with pytest.raises(ValidationError):
-            Settings()
+    with patch.dict(os.environ, {}, clear=True), pytest.raises(ValidationError):
+        _IsolatedSettings()
 
 
 def test_settings_custom_overrides():
