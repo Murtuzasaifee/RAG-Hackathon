@@ -1,16 +1,40 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import time
 
 import structlog
 
 from rag_hackathon.api.schemas import CitationResponse, QueryRequest, QueryResponse
+from rag_hackathon.cache.protocols import CacheStore
 from rag_hackathon.core.errors import GuardError
 from rag_hackathon.generation.protocols import Generator
 from rag_hackathon.retrieval.protocols import Reranker, Retriever
 from rag_hackathon.security.protocols import InputGuard, OutputGuard
 
 logger = structlog.get_logger("rag_hackathon.query_service")
+
+
+def _answer_cache_key(
+    query: str,
+    doc_ids: list[str] | None,
+    version_ids: list[str] | None,
+    top_k: int,
+    top_n: int,
+    version_hash: str,
+    epoch_map: dict[str, int],
+) -> str:
+    parts = [
+        query,
+        json.dumps(sorted(doc_ids or [])),
+        json.dumps(sorted(version_ids or [])),
+        str(top_k),
+        str(top_n),
+        version_hash,
+        json.dumps(sorted(epoch_map.items())),
+    ]
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
 
 class QueryService:
@@ -21,12 +45,37 @@ class QueryService:
         generator: Generator,
         input_guard: InputGuard | None = None,
         output_guard: OutputGuard | None = None,
+        cache: CacheStore | None = None,
+        cache_ttl_answer: int = 3600,
     ) -> None:
         self._retriever = retriever
         self._reranker = reranker
         self._generator = generator
         self._input_guard = input_guard
         self._output_guard = output_guard
+        self._cache = cache
+        self._cache_ttl_answer = cache_ttl_answer
+
+    async def _compute_version_context(
+        self, doc_ids: list[str] | None
+    ) -> tuple[str, dict[str, int]]:
+        if self._cache is None:
+            return "", {}
+        version_hash = "no_filter"
+        epoch_map: dict[str, int] = {}
+        if doc_ids:
+            for did in doc_ids:
+                epoch_raw = await self._cache.get(
+                    "doc_epoch", did
+                )
+                epoch_map[did] = int(epoch_raw) if epoch_raw else 0
+        else:
+            epoch_map = {}
+        active_key = hashlib.sha256(
+            json.dumps(sorted(epoch_map.items())).encode()
+        ).hexdigest()[:16]
+        version_hash = active_key
+        return version_hash, epoch_map
 
     async def run(
         self,
@@ -45,6 +94,36 @@ class QueryService:
             if not input_result.is_valid:
                 raise GuardError(
                     f"Input blocked: {', '.join(input_result.reasons)}"
+                )
+
+        version_hash, epoch_map = await self._compute_version_context(
+            request.doc_ids
+        )
+
+        if self._cache is not None:
+            cache_key = _answer_cache_key(
+                query=request.query,
+                doc_ids=request.doc_ids,
+                version_ids=request.version_ids,
+                top_k=request.top_k,
+                top_n=request.top_n,
+                version_hash=version_hash,
+                epoch_map=epoch_map,
+            )
+            cached = await self._cache.get_json("answer", cache_key)
+            if cached is not None:
+                logger.info(
+                    "query answered from cache",
+                    request_id=request_id,
+                )
+                return QueryResponse(
+                    answer=cached["answer"],
+                    citations=[
+                        CitationResponse(**c) for c in cached["citations"]
+                    ],
+                    request_id=request_id,
+                    timings_ms={"cache_hit": 1},
+                    warnings=[],
                 )
 
         t0 = time.perf_counter()
@@ -92,6 +171,26 @@ class QueryService:
             )
             for c in answer.citations
         ]
+
+        if self._cache is not None:
+            cache_key = _answer_cache_key(
+                query=request.query,
+                doc_ids=request.doc_ids,
+                version_ids=request.version_ids,
+                top_k=request.top_k,
+                top_n=request.top_n,
+                version_hash=version_hash,
+                epoch_map=epoch_map,
+            )
+            await self._cache.set_json(
+                "answer",
+                cache_key,
+                {
+                    "answer": answer.text,
+                    "citations": [c.model_dump() for c in citations],
+                },
+                self._cache_ttl_answer,
+            )
 
         logger.info(
             "query completed",
