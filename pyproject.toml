@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.136.1",
     "httpx>=0.28.1",
     "logfire>=4.32.1",
+    "openai>=2.33.0",
     "pydantic>=2.13.3",
     "pydantic-settings>=2.14.0",
     "python-multipart>=0.0.27",
@@ -25,6 +26,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+filterwarnings = ["ignore:No logs or spans:logfire._internal.config.LogfireNotConfiguredWarning"]
 
 [tool.ruff]
 target-version = "py313"
