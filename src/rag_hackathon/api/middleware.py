@@ -1,26 +1,45 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 import structlog
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.requests import Request
-from starlette.responses import Response
 
 from rag_hackathon.observability.logging import request_id_var
 
 logger = structlog.get_logger("rag_hackathon.middleware")
 
+_HEADER = "x-request-id"
 
-class RequestIdMiddleware(BaseHTTPMiddleware):
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
-        rid = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+
+class RequestIdMiddleware:
+    def __init__(self, app: Callable) -> None:
+        self.app = app
+
+    async def __call__(
+        self, scope: dict[str, Any], receive: Callable, send: Callable
+    ) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(
+            (k.decode().lower(), v.decode()) for k, v in scope.get("headers", [])
+        )
+        rid = headers.get(_HEADER) or str(uuid.uuid4())
         token = request_id_var.set(rid)
+
+        async def _send(message: dict[str, Any]) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.append(
+                    (f"{_HEADER}".encode(), rid.encode())
+                )
+                message["headers"] = headers
+            await send(message)
+
         try:
-            response = await call_next(request)
-            response.headers["X-Request-Id"] = rid
-            return response
+            await self.app(scope, receive, _send)
         finally:
             request_id_var.reset(token)
