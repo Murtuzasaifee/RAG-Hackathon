@@ -7,7 +7,7 @@ from fastapi import FastAPI
 
 from rag_hackathon.api.error_handlers import RAGError, rag_error_handler
 from rag_hackathon.api.middleware import RequestIdMiddleware
-from rag_hackathon.api.routers import health
+from rag_hackathon.api.routers import health, ingest
 from rag_hackathon.observability.logging import configure_logging
 
 
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RAGError, rag_error_handler)
 
     app.include_router(health.router)
+    app.include_router(ingest.router)
 
     return app
 
