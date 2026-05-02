@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 from rag_hackathon.core.types import RetrievalHit
+from rag_hackathon.gateway.protocols import RerankHit
 from rag_hackathon.retrieval.hybrid_qdrant import HybridQdrantRetriever
 from rag_hackathon.retrieval.reranker_cohere import CohereReranker
-from rag_hackathon.gateway.protocols import RerankHit
 
 
 def _make_hit(
@@ -42,12 +42,13 @@ class TestHybridQdrantRetriever:
         from rag_hackathon.ingestion.embedders.protocols import SparseVector
 
         emb = AsyncMock()
-        emb.embed.return_value = [SparseVector(indices=[1, 5, 10], values=[0.3, 0.7, 0.1])]
+        emb.embed.return_value = [
+            SparseVector(indices=[1, 5, 10], values=[0.3, 0.7, 0.1])
+        ]
         return emb
 
     @pytest.fixture
     def qdrant_client(self) -> AsyncMock:
-        from qdrant_client import models
 
         client = AsyncMock()
 
@@ -139,7 +140,9 @@ class TestHybridQdrantRetriever:
         assert "version_id" in must_fields
 
     @pytest.mark.asyncio
-    async def test_hybrid_retrieve_qdrant_error_raises(self, dense_embedder, sparse_embedder):
+    async def test_hybrid_retrieve_qdrant_error_raises(
+        self, dense_embedder, sparse_embedder
+    ):
         qdrant_client = AsyncMock()
         qdrant_client.query_points.side_effect = Exception("connection refused")
         from rag_hackathon.core.errors import RetrievalError
@@ -166,7 +169,10 @@ class TestCohereReranker:
             RerankHit(index=1, document="second", relevance_score=0.95),
             RerankHit(index=0, document="first", relevance_score=0.80),
         ]
-        hits = [_make_hit(chunk_index=0, score=0.5), _make_hit(chunk_index=1, score=0.6)]
+        hits = [
+            _make_hit(chunk_index=0, score=0.5),
+            _make_hit(chunk_index=1, score=0.6),
+        ]
         reranker = CohereReranker(client=gateway, model="rerank-english-v3.0")
         result = await reranker.rerank("query", hits, top_n=2)
         assert len(result) == 2

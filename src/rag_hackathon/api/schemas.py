@@ -24,7 +24,7 @@ class JobStatusResponse(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1)
     doc_ids: list[str] | None = None
     version_ids: list[str] | None = None
     top_k: int = 20

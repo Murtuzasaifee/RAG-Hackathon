@@ -14,7 +14,13 @@ def build_messages(query: str, hits: list[dict]) -> list[dict[str, str]]:
     if not hits:
         return [
             {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": f"Question: {query}\n\nNo relevant context was found."},
+            {
+                "role": "user",
+                "content": (
+                    f"Question: {query}\n\n"
+                    "No relevant context was found."
+                ),
+            },
         ]
 
     context_parts: list[str] = []
