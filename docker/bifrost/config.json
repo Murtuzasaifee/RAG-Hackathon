@@ -1,0 +1,15 @@
+{
+  "providers": {
+    "openai": {
+      "type": "openai",
+      "api_key": "${OPENAI_API_KEY}"
+    },
+    "cohere": {
+      "type": "cohere",
+      "api_key": "${COHERE_API_KEY}"
+    }
+  },
+  "server": {
+    "port": 8080
+  }
+}
