@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RAG Demo</title>
+    <link rel="stylesheet" href="/static/demo/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>RAG Demo</h1>
+        <p>Upload, ask, inspect the source.</p>
+      </div>
+      <div id="healthStatus" class="status status-muted">Checking</div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2>Document</h2>
+          <form id="uploadForm" class="stack">
+            <label>
+              <span>PDF file</span>
+              <input id="fileInput" type="file" accept="application/pdf" required />
+            </label>
+            <label>
+              <span>Document ID</span>
+              <input id="docIdInput" type="text" placeholder="optional" />
+            </label>
+            <button id="uploadButton" type="submit">Upload</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <h2>Job</h2>
+          <div class="job-grid">
+            <span>State</span><strong id="jobState">Idle</strong>
+            <span>Stage</span><strong id="jobStage">-</strong>
+            <span>Progress</span><strong id="jobProgress">0%</strong>
+          </div>
+          <progress id="jobBar" max="100" value="0"></progress>
+          <p id="jobMeta" class="muted">No active ingestion job.</p>
+        </section>
+
+        <section class="panel">
+          <h2>Question</h2>
+          <form id="queryForm" class="stack">
+            <label>
+              <span>Ask</span>
+              <textarea id="queryInput" rows="5" placeholder="What does this document say about...?" required></textarea>
+            </label>
+            <label>
+              <span>Document IDs</span>
+              <input id="queryDocIds" type="text" placeholder="comma separated, optional" />
+            </label>
+            <label>
+              <span>Version IDs</span>
+              <input id="queryVersionIds" type="text" placeholder="comma separated, optional" />
+            </label>
+            <div class="split">
+              <label>
+                <span>Top K</span>
+                <input id="topKInput" type="number" min="1" max="100" value="20" />
+              </label>
+              <label>
+                <span>Top N</span>
+                <input id="topNInput" type="number" min="1" max="20" value="5" />
+              </label>
+            </div>
+            <button id="askButton" type="submit">Ask</button>
+          </form>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <section class="panel answer-panel">
+          <div class="panel-header">
+            <h2>Answer</h2>
+            <span id="requestMeta" class="muted"></span>
+          </div>
+          <div id="answerOutput" class="answer empty">Ask a question to see the grounded answer.</div>
+          <div id="warningOutput" class="warnings"></div>
+          <div id="timingOutput" class="timings"></div>
+        </section>
+
+        <section class="source-grid">
+          <section class="panel pdf-panel">
+            <div class="panel-header">
+              <h2>PDF Source</h2>
+              <div class="pdf-controls">
+                <button id="prevPageButton" type="button" aria-label="Previous page">&lt;</button>
+                <span id="pageIndicator">- / -</span>
+                <button id="nextPageButton" type="button" aria-label="Next page">&gt;</button>
+              </div>
+            </div>
+            <div id="pdfMessage" class="muted">Upload a PDF to enable source preview.</div>
+            <div id="pdfViewport" class="pdf-viewport" hidden>
+              <canvas id="pdfCanvas"></canvas>
+              <svg id="overlayLayer" class="overlay-layer" aria-hidden="true"></svg>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Citations</h2>
+              <span id="citationCount" class="muted">0</span>
+            </div>
+            <div id="citationList" class="citation-list empty">Citations will appear here.</div>
+          </section>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Source Detail</h2>
+            <button id="copyCitationButton" type="button">Copy</button>
+          </div>
+          <div id="sourceDetail" class="source-detail empty">Select a citation to inspect its lineage and chunk text.</div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/static/demo/app.js" type="module"></script>
+  </body>
+</html>
