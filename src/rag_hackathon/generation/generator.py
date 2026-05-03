@@ -46,6 +46,7 @@ class GroundedGenerator:
                     section_path=list(h.section_path),
                     bbox=list(h.bbox),
                     chunk_text=h.chunk_text,
+                    chunk_type=h.chunk_type,
                     score=h.score,
                 )
                 for h in hits

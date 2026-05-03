@@ -18,6 +18,15 @@ class SpladeSparseEmbedder:
     def _load(self, hf_token: str | None = None) -> None:
         if self._model is not None:
             return
+
+        # Disable the background safetensors conversion thread — it POSTs to
+        # safetensors-convert.hf.space which is often unavailable (503).
+        try:
+            import transformers.safetensors_conversion as _sc
+            _sc.auto_conversion = lambda *args, **kwargs: None
+        except Exception:
+            pass
+
         from transformers import AutoModelForMaskedLM, AutoTokenizer
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._model_name, token=hf_token)

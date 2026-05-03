@@ -44,7 +44,7 @@ def configure_logging() -> None:
     root = logging.getLogger()
     root.handlers.clear()
     root.addHandler(handler)
-    root.setLevel(logging.INFO)
+    root.setLevel(logging.DEBUG)
 
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
