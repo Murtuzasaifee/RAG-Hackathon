@@ -7,11 +7,13 @@ from typing import Any
 import logfire
 from fastapi import FastAPI
 
+from rag_hackathon.core.settings import get_settings
 from rag_hackathon.observability.logging import request_id_var
 
 
 def configure_tracing(app: FastAPI) -> None:
-    logfire.configure()
+    settings = get_settings()
+    logfire.configure(token=settings.logfire_token)
     logfire.instrument_fastapi(app)
     logfire.instrument_httpx()
     logfire.instrument_pydantic()

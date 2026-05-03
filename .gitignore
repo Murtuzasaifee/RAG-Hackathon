@@ -21,3 +21,8 @@ docs/
 .idea/
 .vscode/
 *.swp
+
+experiment/
+samples/
+scripts/
+output/

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from rag_hackathon.ingestion.chunkers.protocols import Chunker
-from rag_hackathon.ingestion.chunkers.structure_aware import StructureAwareChunker
+from rag_hackathon.ingestion.chunkers.chunker import DocumentAwareChunker
 
 _REGISTRY: dict[str, type[Chunker]] = {
-    "structure_aware": StructureAwareChunker,
+    "document_aware": DocumentAwareChunker
 }
 
 

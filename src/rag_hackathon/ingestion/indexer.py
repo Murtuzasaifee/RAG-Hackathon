@@ -80,14 +80,19 @@ class QdrantIndexer:
                 )
 
             batch_size = 64
+            n_batches = (len(points) + batch_size - 1) // batch_size
+            logger.info("upsert_started", doc_id=doc_id, version_id=version_id, total_points=len(points), n_batches=n_batches)
             for offset in range(0, len(points), batch_size):
                 batch = points[offset : offset + batch_size]
+                batch_num = offset // batch_size + 1
                 try:
                     await self._client.upsert(
                         collection_name=self._collection,
                         points=batch,
                     )
+                    logger.debug("upsert_batch_done", doc_id=doc_id, batch=batch_num, n_batches=n_batches, size=len(batch))
                 except Exception as exc:
                     raise IngestionError(
-                        f"Qdrant upsert failed: {exc}"
+                        f"Qdrant upsert failed at batch {batch_num}: {exc}"
                     ) from exc
+            logger.info("upsert_complete", doc_id=doc_id, version_id=version_id, total_points=len(points))

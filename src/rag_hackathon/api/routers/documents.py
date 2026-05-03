@@ -66,11 +66,7 @@ async def _run_reingest_pipeline(
 
         await _update("running", "chunking", 30)
         chunker = get_chunker(settings.chunker_strategy)
-        chunks = chunker.chunk(
-            parsed,
-            max_tokens=settings.chunk_max_tokens,
-            overlap=settings.chunk_overlap,
-        )
+        chunks = chunker.chunk(parsed, max_tokens=settings.chunk_max_tokens)
 
         for i, c in enumerate(chunks):
             chunks[i] = c.model_copy(update={"version_id": version_id})

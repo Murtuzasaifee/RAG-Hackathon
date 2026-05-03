@@ -4,7 +4,7 @@ import pytest
 
 from rag_hackathon.core.types import ParsedDocument, ParsedTable
 from rag_hackathon.ingestion.chunkers import get_chunker
-from rag_hackathon.ingestion.chunkers.structure_aware import StructureAwareChunker
+from rag_hackathon.ingestion.chunkers.document_aware import StructureAwareChunker
 
 _P1 = {
     "content": "Short paragraph one.",
@@ -109,8 +109,8 @@ def test_empty_paragraph_produces_no_chunk():
     assert len(chunks) == 0
 
 
-def test_get_chunker_returns_structure_aware():
-    chunker = get_chunker("structure_aware")
+def test_get_chunker_returns_document_aware():
+    chunker = get_chunker("document_aware")
     assert isinstance(chunker, StructureAwareChunker)
 
 

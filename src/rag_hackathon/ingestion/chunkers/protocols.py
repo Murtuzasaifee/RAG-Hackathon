@@ -11,5 +11,4 @@ class Chunker(Protocol):
         parsed: ParsedDocument,
         *,
         max_tokens: int = 512,
-        overlap: int = 50,
     ) -> list[Chunk]: ...

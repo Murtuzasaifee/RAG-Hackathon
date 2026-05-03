@@ -9,6 +9,7 @@ from rag_hackathon.api.error_handlers import RAGError, rag_error_handler
 from rag_hackathon.api.middleware import RequestIdMiddleware
 from rag_hackathon.api.routers import documents, eval, health, ingest, query
 from rag_hackathon.observability.logging import configure_logging
+from rag_hackathon.observability.tracing import configure_tracing
 
 
 @asynccontextmanager
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    configure_tracing(app)
     app.add_middleware(RequestIdMiddleware)
     app.add_exception_handler(RAGError, rag_error_handler)
 

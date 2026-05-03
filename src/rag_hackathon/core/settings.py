@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     top_k_sparse: int = 20
     top_n_rerank: int = 5
 
-    chunker_strategy: str = "structure_aware"
+    chunker_strategy: str = "document_aware"
     sparse_enabled: bool = True
 
     chunk_max_tokens: int = 512

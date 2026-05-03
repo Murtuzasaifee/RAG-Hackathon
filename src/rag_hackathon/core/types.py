@@ -8,31 +8,24 @@ from pydantic import BaseModel, ConfigDict, Field
 
 NAMESPACE_RAG = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 
+ChunkType = Literal["text", "table", "image", "formula", "algorithm"]
 
-class Section(BaseModel):
+
+class ParsedElement(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    heading: str
-    level: int
-    children: list[Section] = Field(default_factory=list)
-
-
-class ParsedTable(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    markdown: str
+    label: str  # document_title, paragraph_title, figure_title, text, table, image, formula, algorithm
+    text: str
+    bbox: list[float] = Field(default_factory=list)
+    reading_order: int
     page: int
-    bbox: list[float]
-    section_path: list[str] = Field(default_factory=list)
 
 
 class ParsedDocument(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     doc_id: str
-    sections: list[Section] = Field(default_factory=list)
-    paragraphs: list[dict] = Field(default_factory=list)
-    tables: list[ParsedTable] = Field(default_factory=list)
+    elements: list[ParsedElement] = Field(default_factory=list)
 
 
 class Chunk(BaseModel):
@@ -45,7 +38,7 @@ class Chunk(BaseModel):
     page: int
     section_path: list[str] = Field(default_factory=list)
     bbox: list[float] = Field(default_factory=list)
-    chunk_type: Literal["text", "table"] = "text"
+    chunk_type: ChunkType = "text"
 
 
 class Citation(BaseModel):
@@ -70,7 +63,7 @@ class RetrievalHit(BaseModel):
     page: int
     section_path: list[str] = Field(default_factory=list)
     bbox: list[float] = Field(default_factory=list)
-    chunk_type: Literal["text", "table"] = "text"
+    chunk_type: ChunkType = "text"
     score: float
 
 
