@@ -14,22 +14,3 @@ class GatewayClient(Protocol):
         model: str,
         **opts: object,
     ) -> str: ...
-
-    async def rerank(
-        self,
-        query: str,
-        documents: list[str],
-        model: str,
-        top_n: int,
-    ) -> list[RerankHit]: ...
-
-
-class RerankHit:
-    __slots__ = ("index", "document", "relevance_score")
-
-    def __init__(
-        self, index: int, document: str, relevance_score: float
-    ) -> None:
-        self.index = index
-        self.document = document
-        self.relevance_score = relevance_score

@@ -45,14 +45,21 @@ services:
       - "8081:8080"
     env_file: .env
     volumes:
-      - ./docker/bifrost/config.json:/app/config.json
+      - ./docker/bifrost/config.json:/app/data/config.json
 
   llm-guard:
     image: laiyer/llm-guard-api:latest
     ports:
       - "8001:8000"
+    environment:
+      CONFIG_FILE: /app/scanners.yml
     volumes:
       - ./docker/llm-guard/scanners.yml:/app/scanners.yml
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    restart: on-failure
 
 volumes:
   qdrant_data:

@@ -1,17 +1,15 @@
+app:
+  name: LLM Guard API
+  scan_fail_fast: false
+  scan_prompt_timeout: 120
+  scan_output_timeout: 120
+  lazy_load: true
+
 input_scanners:
-  - name: PromptInjection
-  - name: Anonymize
-  - name: Toxicity
-  - name: BanTopics
-    params:
-      topics: ["violence", "self-harm"]
-  - name: TokenLimit
+  - type: PromptInjection
+  - type: TokenLimit
     params:
       limit: 4096
 
 output_scanners:
-  - name: FactualConsistency
-  - name: Sensitive
-  - name: NoRefusal
-  - name: Relevance
-  - name: Deanonymize
+  - type: FactualConsistency

@@ -3,19 +3,81 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import redis.asyncio as aioredis
 from fastapi import FastAPI
+from qdrant_client import AsyncQdrantClient
 
 from rag_hackathon.api.error_handlers import RAGError, rag_error_handler
 from rag_hackathon.api.middleware import RequestIdMiddleware
 from rag_hackathon.api.routers import documents, eval, health, ingest, query
+from rag_hackathon.api.services.query_service import QueryService
+from rag_hackathon.cache.redis_cache import RedisCache
+from rag_hackathon.core.settings import get_settings
+from rag_hackathon.generation.generator import GroundedGenerator
+from rag_hackathon.gateway.bifrost import BifrostClient
+from rag_hackathon.ingestion.embedders.openai_dense import OpenAIDenseEmbedder
+from rag_hackathon.ingestion.embedders.splade_sparse import SpladeSparseEmbedder
 from rag_hackathon.observability.logging import configure_logging
 from rag_hackathon.observability.tracing import configure_tracing
+from rag_hackathon.retrieval.hybrid_qdrant import HybridQdrantRetriever
+from rag_hackathon.retrieval.reranker_cohere import CohereReranker
+from rag_hackathon.security.guard import LLMGuardClient
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
+    settings = get_settings()
+
+    bifrost = BifrostClient(
+        base_url=settings.bifrost_url,
+        api_key=settings.openai_api_key,
+        chat_provider=settings.llm_provider,
+        chat_api_key=settings.mesh_api_key,
+        chat_base_url="https://api.meshapi.ai",
+    )
+    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    redis_client = aioredis.from_url(settings.redis_url)
+
+    dense_embedder = OpenAIDenseEmbedder(bifrost, settings.embedding_model)
+    sparse_embedder = (
+        SpladeSparseEmbedder(settings.splade_model, hf_token=settings.huggingface_token)
+        if settings.sparse_enabled
+        else None
+    )
+
+    retriever = HybridQdrantRetriever(
+        client=qdrant,
+        collection=settings.qdrant_collection,
+        dense_embedder=dense_embedder,
+        sparse_embedder=sparse_embedder,
+        rrf_k=settings.rrf_k,
+    )
+    reranker = CohereReranker(settings.cohere_api_key, settings.rerank_model)
+    generator = GroundedGenerator(bifrost, settings.llm_model)
+    cache = RedisCache(redis_client)
+    guard = LLMGuardClient(settings.llm_guard_url)
+
+    app.state.query_service = QueryService(
+        retriever=retriever,
+        reranker=reranker,
+        generator=generator,
+        input_guard=guard,
+        output_guard=guard if settings.llm_guard_output_enabled else None,
+        cache=cache,
+        cache_ttl_answer=settings.cache_ttl_answer,
+    )
+    app.state.redis = redis_client
+    app.state.qdrant = qdrant
+    app.state.bifrost = bifrost
+
     yield
+
+    await guard.close()
+    await reranker.close()
+    await bifrost.close()
+    await qdrant.close()
+    await redis_client.aclose()
 
 
 def create_app() -> FastAPI:

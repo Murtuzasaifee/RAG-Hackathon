@@ -5,7 +5,6 @@ import structlog
 from openai import AsyncOpenAI
 
 from rag_hackathon.core.errors import GatewayError
-from rag_hackathon.gateway.protocols import RerankHit
 from rag_hackathon.observability.tracing import stage_span
 
 logger = structlog.get_logger("rag_hackathon.gateway")
@@ -17,9 +16,14 @@ class BifrostClient:
         base_url: str,
         api_key: str = "unused",
         chat_provider: str = "",
+        chat_api_key: str | None = None,
+        chat_base_url: str | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._chat_provider = chat_provider
+        self._chat_api_key = chat_api_key or api_key
+        self._chat_base_url = chat_base_url
+
         self._openai = AsyncOpenAI(
             base_url=f"{self._base_url}/openai/v1",
             api_key=api_key,
@@ -28,10 +32,18 @@ class BifrostClient:
             base_url=self._base_url,
             timeout=httpx.Timeout(60.0),
         )
+        self._chat_http: httpx.AsyncClient | None = None
+        if chat_base_url:
+            self._chat_http = httpx.AsyncClient(
+                base_url=chat_base_url.rstrip("/"),
+                timeout=httpx.Timeout(60.0),
+            )
 
     async def close(self) -> None:
         await self._openai.close()
         await self._http.aclose()
+        if self._chat_http:
+            await self._chat_http.aclose()
 
     async def embed(self, texts: list[str], model: str) -> list[list[float]]:
         if not texts:
@@ -52,8 +64,11 @@ class BifrostClient:
         model: str,
         **opts: object,
     ) -> str:
-        routed_model = f"{self._chat_provider}/{model}" if self._chat_provider else model
-        with stage_span("gateway.chat", model=routed_model):
+        if self._chat_provider and self._chat_provider != "openai":
+            return await self._chat_direct(messages, model)
+
+        routed_model = f"openai/{model}" if not model.startswith("openai/") else model
+        with stage_span("gateway.chat", model=routed_model, provider="openai"):
             try:
                 resp = await self._openai.chat.completions.create(
                     model=routed_model,
@@ -64,39 +79,34 @@ class BifrostClient:
             except Exception as exc:
                 raise GatewayError(f"Chat call failed: {exc}") from exc
 
-    async def rerank(
+    async def _chat_direct(
         self,
-        query: str,
-        documents: list[str],
+        messages: list[dict[str, str]],
         model: str,
-        top_n: int = 5,
-    ) -> list[RerankHit]:
-        if not documents:
-            return []
-        with stage_span("gateway.rerank", model=model, n_docs=len(documents)):
+    ) -> str:
+        routed_model = f"openai/{model}" if not model.startswith("openai/") else model
+        with stage_span("gateway.chat", model=routed_model, provider=self._chat_provider):
+            client = self._chat_http or self._http
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._chat_api_key}",
+            }
             try:
-                resp = await self._http.post(
-                    "/v1/rerank",
+                resp = await client.post(
+                    "/v1/chat/completions",
+                    headers=headers,
                     json={
-                        "model": model,
-                        "query": query,
-                        "documents": documents,
-                        "top_n": top_n,
+                        "model": routed_model,
+                        "messages": messages,
                     },
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                return [
-                    RerankHit(
-                        index=r["index"],
-                        document=r["document"]["text"],
-                        relevance_score=r["relevance_score"],
-                    )
-                    for r in data.get("results", [])
-                ]
+                content = data["choices"][0]["message"]["content"]
+                return content or ""
             except httpx.HTTPStatusError as exc:
                 raise GatewayError(
-                    f"Rerank call failed: {exc.response.status_code}"
+                    f"Chat call failed: {exc.response.status_code} - {exc.response.text}"
                 ) from exc
             except Exception as exc:
-                raise GatewayError(f"Rerank call failed: {exc}") from exc
+                raise GatewayError(f"Chat call failed: {exc}") from exc

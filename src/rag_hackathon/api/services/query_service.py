@@ -56,6 +56,14 @@ class QueryService:
         self._cache = cache
         self._cache_ttl_answer = cache_ttl_answer
 
+        logger.info(
+            "query_service.initialized",
+            input_guard_enabled=input_guard is not None,
+            output_guard_enabled=output_guard is not None,
+            cache_enabled=cache is not None,
+            cache_ttl_answer=cache_ttl_answer,
+        )
+
     async def _compute_version_context(
         self, doc_ids: list[str] | None
     ) -> tuple[str, dict[str, int]]:
@@ -85,19 +93,50 @@ class QueryService:
         timings: dict[str, int] = {}
         warnings: list[str] = []
 
+        logger.info(
+            "query.started",
+            request_id=request_id,
+            query_len=len(request.query),
+            doc_ids=request.doc_ids,
+            version_ids=request.version_ids,
+            top_k=request.top_k,
+            top_n=request.top_n,
+            input_guard_active=self._input_guard is not None,
+            output_guard_active=self._output_guard is not None,
+        )
+
         if self._input_guard is not None:
             t0 = time.perf_counter()
             input_result = await self._input_guard.scan_input(request.query)
-            timings["guard_input_ms"] = int(
-                (time.perf_counter() - t0) * 1000
+            timings["guard_input_ms"] = int((time.perf_counter() - t0) * 1000)
+            logger.info(
+                "query.guard_input_done",
+                request_id=request_id,
+                is_valid=input_result.is_valid,
+                score=input_result.score,
+                reasons=input_result.reasons,
+                duration_ms=timings["guard_input_ms"],
             )
             if not input_result.is_valid:
+                logger.warning(
+                    "query.guard_input_blocked",
+                    request_id=request_id,
+                    reasons=input_result.reasons,
+                )
                 raise GuardError(
                     f"Input blocked: {', '.join(input_result.reasons)}"
                 )
+        else:
+            logger.debug("query.guard_input_skipped", request_id=request_id)
 
         version_hash, epoch_map = await self._compute_version_context(
             request.doc_ids
+        )
+        logger.debug(
+            "query.version_context",
+            request_id=request_id,
+            version_hash=version_hash,
+            epoch_map=epoch_map,
         )
 
         if self._cache is not None:
@@ -110,11 +149,13 @@ class QueryService:
                 version_hash=version_hash,
                 epoch_map=epoch_map,
             )
+            logger.debug("query.cache_lookup", request_id=request_id, cache_key=cache_key[:16])
             cached = await self._cache.get_json("answer", cache_key)
             if cached is not None:
                 logger.info(
-                    "query answered from cache",
+                    "query.cache_hit",
                     request_id=request_id,
+                    n_citations=len(cached.get("citations", [])),
                 )
                 return QueryResponse(
                     answer=cached["answer"],
@@ -125,8 +166,16 @@ class QueryService:
                     timings_ms={"cache_hit": 1},
                     warnings=[],
                 )
+            logger.debug("query.cache_miss", request_id=request_id)
 
         t0 = time.perf_counter()
+        logger.info(
+            "query.retrieve_started",
+            request_id=request_id,
+            top_k=request.top_k,
+            doc_ids=request.doc_ids,
+            version_ids=request.version_ids,
+        )
         hits = await self._retriever.retrieve(
             request.query,
             doc_ids=request.doc_ids,
@@ -134,30 +183,85 @@ class QueryService:
             top_k=request.top_k,
         )
         timings["retrieve_ms"] = int((time.perf_counter() - t0) * 1000)
+        logger.info(
+            "query.retrieve_done",
+            request_id=request_id,
+            n_hits=len(hits),
+            duration_ms=timings["retrieve_ms"],
+            top_scores=[round(h.score, 4) for h in hits[:5]],
+        )
 
         t0 = time.perf_counter()
+        logger.info(
+            "query.rerank_started",
+            request_id=request_id,
+            n_hits=len(hits),
+            top_n=request.top_n,
+        )
         reranked = await self._reranker.rerank(
             request.query, hits, top_n=request.top_n
         )
         timings["rerank_ms"] = int((time.perf_counter() - t0) * 1000)
+        logger.info(
+            "query.rerank_done",
+            request_id=request_id,
+            n_reranked=len(reranked),
+            duration_ms=timings["rerank_ms"],
+            top_scores=[round(h.score, 4) for h in reranked[:5]],
+        )
 
         t0 = time.perf_counter()
+        logger.info(
+            "query.generate_started",
+            request_id=request_id,
+            n_context_chunks=len(reranked),
+        )
         answer = await self._generator.generate(request.query, reranked)
         timings["generate_ms"] = int((time.perf_counter() - t0) * 1000)
+        logger.info(
+            "query.generate_done",
+            request_id=request_id,
+            answer_chars=len(answer.text),
+            n_citations=len(answer.citations),
+            duration_ms=timings["generate_ms"],
+        )
 
         if self._output_guard is not None and answer.citations:
             t0 = time.perf_counter()
             context_text = " ".join(c.chunk_text for c in answer.citations)
+            logger.info(
+                "query.guard_output_started",
+                request_id=request_id,
+                context_chars=len(context_text),
+                answer_chars=len(answer.text),
+                n_citation_chunks=len(answer.citations),
+            )
             output_result = await self._output_guard.scan_output(
                 context_text, answer.text
             )
-            timings["guard_output_ms"] = int(
-                (time.perf_counter() - t0) * 1000
+            timings["guard_output_ms"] = int((time.perf_counter() - t0) * 1000)
+            logger.info(
+                "query.guard_output_done",
+                request_id=request_id,
+                is_valid=output_result.is_valid,
+                score=output_result.score,
+                reasons=output_result.reasons,
+                duration_ms=timings["guard_output_ms"],
             )
             if not output_result.is_valid:
                 warnings.append("low_groundedness")
+                logger.warning(
+                    "query.guard_output_low_groundedness",
+                    request_id=request_id,
+                    score=output_result.score,
+                    reasons=output_result.reasons,
+                )
             if output_result.score < 0.5:
                 warnings.append(f"low_groundedness_score:{output_result.score:.2f}")
+        elif self._output_guard is None:
+            logger.debug("query.guard_output_skipped", request_id=request_id, reason="disabled")
+        else:
+            logger.debug("query.guard_output_skipped", request_id=request_id, reason="no_citations")
 
         citations = [
             CitationResponse(
@@ -191,14 +295,17 @@ class QueryService:
                 },
                 self._cache_ttl_answer,
             )
+            logger.debug("query.cache_stored", request_id=request_id)
 
+        total_ms = sum(timings.values())
         logger.info(
-            "query completed",
+            "query.completed",
             request_id=request_id,
             n_hits=len(hits),
             n_reranked=len(reranked),
             n_citations=len(citations),
             timings_ms=timings,
+            total_ms=total_ms,
             warnings=warnings,
         )
 
