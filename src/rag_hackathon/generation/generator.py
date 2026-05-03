@@ -46,6 +46,7 @@ class GroundedGenerator:
                     page=h.page,
                     section_path=list(h.section_path),
                     bbox=list(h.bbox),
+                    page_bboxes=list(h.page_bboxes),
                     chunk_text=h.chunk_text,
                     chunk_type=h.chunk_type,
                     score=h.score,

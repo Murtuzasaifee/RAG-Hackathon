@@ -165,6 +165,7 @@ class QueryService:
                     request_id=request_id,
                     timings_ms={"cache_hit": 1},
                     warnings=[],
+                    cache_hit=True,
                 )
             logger.debug("query.cache_miss", request_id=request_id)
 
@@ -270,6 +271,7 @@ class QueryService:
                 page=c.page,
                 section_path=list(c.section_path),
                 bbox=list(c.bbox),
+                page_bboxes=list(c.page_bboxes),
                 chunk_text=c.chunk_text,
                 chunk_type=c.chunk_type,
                 score=c.score,

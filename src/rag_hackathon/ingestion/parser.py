@@ -37,6 +37,12 @@ class _RawElement:
     bbox: list[float]
 
 
+@dataclass(frozen=True)
+class _PageGeometry:
+    width: float
+    height: float
+
+
 # ---------------------------------------------------------------------------
 # PDF helpers
 # ---------------------------------------------------------------------------
@@ -93,6 +99,32 @@ def _polygon_to_bbox(polygon: list[float]) -> list[float]:
     return []
 
 
+def _page_geometry(result: Any) -> _PageGeometry | None:
+    pages = getattr(result, "pages", None) or []
+    if not pages:
+        return None
+    page = pages[0]
+    width = float(getattr(page, "width", 0) or 0)
+    height = float(getattr(page, "height", 0) or 0)
+    if width <= 0 or height <= 0:
+        return None
+    return _PageGeometry(width=width, height=height)
+
+
+def _normalize_bbox(bbox: list[float], geometry: _PageGeometry | None) -> list[float]:
+    if len(bbox) != 4 or geometry is None:
+        return bbox
+
+    x0, y0, x1, y1 = bbox
+    normalized = [
+        x0 / geometry.width,
+        y0 / geometry.height,
+        x1 / geometry.width,
+        y1 / geometry.height,
+    ]
+    return [round(min(1.0, max(0.0, value)), 6) for value in normalized]
+
+
 def _table_to_markdown(table: Any) -> str:
     rows: list[list[str]] = []
     for cell in table.cells:
@@ -121,7 +153,11 @@ def _table_to_markdown(table: Any) -> str:
 # All page numbers are overridden with `actual_page`.
 # ---------------------------------------------------------------------------
 
-def _extract_paragraphs(result: Any, actual_page: int) -> list[_RawElement]:
+def _extract_paragraphs(
+    result: Any,
+    actual_page: int,
+    geometry: _PageGeometry | None,
+) -> list[_RawElement]:
     raw: list[_RawElement] = []
     for p in result.paragraphs or []:
         role = getattr(p, "role", None)
@@ -136,11 +172,16 @@ def _extract_paragraphs(result: Any, actual_page: int) -> list[_RawElement]:
         if p.bounding_regions:
             bbox = _polygon_to_bbox(p.bounding_regions[0].polygon or [])
             y_min = bbox[1] if len(bbox) >= 4 else 0.0
+            bbox = _normalize_bbox(bbox, geometry)
         raw.append(_RawElement(page=actual_page, y_min=y_min, label=label, text=text, bbox=bbox))
     return raw
 
 
-def _extract_tables(result: Any, actual_page: int) -> list[_RawElement]:
+def _extract_tables(
+    result: Any,
+    actual_page: int,
+    geometry: _PageGeometry | None,
+) -> list[_RawElement]:
     raw: list[_RawElement] = []
     for table in result.tables or []:
         markdown = _table_to_markdown(table)
@@ -151,11 +192,16 @@ def _extract_tables(result: Any, actual_page: int) -> list[_RawElement]:
         if table.bounding_regions:
             bbox = _polygon_to_bbox(table.bounding_regions[0].polygon or [])
             y_min = bbox[1] if len(bbox) >= 4 else 0.0
+            bbox = _normalize_bbox(bbox, geometry)
         raw.append(_RawElement(page=actual_page, y_min=y_min, label="table", text=markdown, bbox=bbox))
     return raw
 
 
-def _extract_figures(result: Any, actual_page: int) -> list[_RawElement]:
+def _extract_figures(
+    result: Any,
+    actual_page: int,
+    geometry: _PageGeometry | None,
+) -> list[_RawElement]:
     raw: list[_RawElement] = []
     for figure in getattr(result, "figures", None) or []:
         caption = ""
@@ -166,15 +212,17 @@ def _extract_figures(result: Any, actual_page: int) -> list[_RawElement]:
         if figure.bounding_regions:
             bbox = _polygon_to_bbox(figure.bounding_regions[0].polygon or [])
             y_min = bbox[1] if len(bbox) >= 4 else 0.0
+            bbox = _normalize_bbox(bbox, geometry)
         raw.append(_RawElement(page=actual_page, y_min=y_min, label="image", text=caption, bbox=bbox))
     return raw
 
 
 def _result_to_raw_elements(result: Any, actual_page: int) -> list[_RawElement]:
+    geometry = _page_geometry(result)
     raw: list[_RawElement] = []
-    raw.extend(_extract_paragraphs(result, actual_page))
-    raw.extend(_extract_tables(result, actual_page))
-    raw.extend(_extract_figures(result, actual_page))
+    raw.extend(_extract_paragraphs(result, actual_page, geometry))
+    raw.extend(_extract_tables(result, actual_page, geometry))
+    raw.extend(_extract_figures(result, actual_page, geometry))
     return raw
 
 

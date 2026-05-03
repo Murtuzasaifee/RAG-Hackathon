@@ -9,7 +9,7 @@ from qdrant_client import AsyncQdrantClient
 
 from rag_hackathon.api.error_handlers import RAGError, rag_error_handler
 from rag_hackathon.api.middleware import RequestIdMiddleware
-from rag_hackathon.api.routers import documents, eval, health, ingest, query
+from rag_hackathon.api.routers import demo, documents, eval, health, ingest, query
 from rag_hackathon.api.services.query_service import QueryService
 from rag_hackathon.cache.redis_cache import RedisCache
 from rag_hackathon.core.settings import get_settings
@@ -90,11 +90,13 @@ def create_app() -> FastAPI:
     configure_tracing(app)
     app.add_middleware(RequestIdMiddleware)
     app.add_exception_handler(RAGError, rag_error_handler)
+    app.mount("/static/demo", demo.static_files, name="demo-static")
 
     app.include_router(health.router)
     app.include_router(ingest.router)
     app.include_router(query.router)
     app.include_router(documents.router)
+    app.include_router(demo.router)
     # app.include_router(eval.router)
 
     return app

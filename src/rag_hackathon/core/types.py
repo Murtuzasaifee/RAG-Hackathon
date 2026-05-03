@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -38,6 +38,7 @@ class Chunk(BaseModel):
     page: int
     section_path: list[str] = Field(default_factory=list)
     bbox: list[float] = Field(default_factory=list)
+    page_bboxes: list[dict[str, Any]] = Field(default_factory=list)
     chunk_type: ChunkType = "text"
 
 
@@ -49,6 +50,7 @@ class Citation(BaseModel):
     page: int
     section_path: list[str] = Field(default_factory=list)
     bbox: list[float] = Field(default_factory=list)
+    page_bboxes: list[dict[str, Any]] = Field(default_factory=list)
     chunk_text: str
     chunk_type: ChunkType = "text"
     score: float
@@ -64,6 +66,7 @@ class RetrievalHit(BaseModel):
     page: int
     section_path: list[str] = Field(default_factory=list)
     bbox: list[float] = Field(default_factory=list)
+    page_bboxes: list[dict[str, Any]] = Field(default_factory=list)
     chunk_type: ChunkType = "text"
     score: float
 

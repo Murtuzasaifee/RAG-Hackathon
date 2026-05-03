@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -37,6 +39,7 @@ class CitationResponse(BaseModel):
     page: int
     section_path: list[str] = Field(default_factory=list)
     bbox: list[float] = Field(default_factory=list)
+    page_bboxes: list[dict[str, Any]] = Field(default_factory=list)
     chunk_text: str
     chunk_type: str = "text"
     score: float
@@ -48,6 +51,7 @@ class QueryResponse(BaseModel):
     request_id: str
     timings_ms: dict[str, int] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    cache_hit: bool = False
 
 
 class EvalQuestionResult(BaseModel):

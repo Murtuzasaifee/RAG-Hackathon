@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     huggingface_token: str | None = None
 
     bifrost_url: str = "http://localhost:8080"
+    bifrost_public_url: str | None = None
+    logfire_project_url: str = "https://logfire-us.pydantic.dev/msaifee/rag-hackathon"
     llm_guard_url: str = "http://localhost:8001"
     qdrant_url: str = "http://localhost:6333"
     redis_url: str = "redis://localhost:6379/0"

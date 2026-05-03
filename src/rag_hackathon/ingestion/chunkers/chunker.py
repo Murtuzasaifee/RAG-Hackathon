@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from rag_hackathon.core.types import Chunk, ChunkType, ParsedDocument, ParsedElement
 from rag_hackathon.observability.tracing import stage_span
 
@@ -48,6 +50,19 @@ def _update_section_path(section_path: list[str], label: str, text: str) -> list
     return section_path  # figure_title doesn't change section hierarchy
 
 
+def _union_bbox(bboxes: list[list[float]]) -> list[float]:
+    """Compute the bounding union of multiple [x0, y0, x1, y1] boxes."""
+    valid = [b for b in bboxes if len(b) == 4]
+    if not valid:
+        return []
+    return [
+        min(b[0] for b in valid),
+        min(b[1] for b in valid),
+        max(b[2] for b in valid),
+        max(b[3] for b in valid),
+    ]
+
+
 class DocumentAwareChunker:
     def chunk(
         self,
@@ -76,16 +91,41 @@ def _chunk_document(
     current_labels: list[str] = []
     current_tokens: int = 0
     current_page: int = sorted_els[0].page
-    current_bbox: list[float] = []
+    # Accumulate all per-element {page, bbox} pairs for the current chunk
+    current_page_bboxes: list[dict[str, Any]] = []
 
     pending_title: str | None = None
     pending_title_label: str | None = None
     pending_title_page: int = current_page
 
+    def _make_chunk(
+        texts: list[str],
+        labels: list[str],
+        page: int,
+        page_bboxes: list[dict[str, Any]],
+    ) -> Chunk:
+        nonlocal chunk_idx
+        # Union of all bboxes on the primary page for the top-level bbox field
+        primary_bboxes = [pb["bbox"] for pb in page_bboxes if pb["page"] == page]
+        union = _union_bbox(primary_bboxes)
+        c = Chunk(
+            doc_id=doc_id,
+            version_id="",
+            chunk_index=chunk_idx,
+            text="\n\n".join(texts),
+            page=page,
+            section_path=list(section_path),
+            bbox=union,
+            page_bboxes=list(page_bboxes),
+            chunk_type=_infer_chunk_type(labels),
+        )
+        chunk_idx += 1
+        return c
+
     def flush_current() -> None:
-        nonlocal current_texts, current_labels, current_tokens, chunk_idx
+        nonlocal current_texts, current_labels, current_tokens
         nonlocal pending_title, pending_title_label, pending_title_page
-        nonlocal current_page, current_bbox
+        nonlocal current_page, current_page_bboxes
 
         if not current_texts and pending_title is None:
             return
@@ -108,23 +148,11 @@ def _chunk_document(
         if not texts_to_flush:
             return
 
-        chunks.append(
-            Chunk(
-                doc_id=doc_id,
-                version_id="",
-                chunk_index=chunk_idx,
-                text="\n\n".join(texts_to_flush),
-                page=page_to_use,
-                section_path=list(section_path),
-                bbox=current_bbox if len(current_texts) == 1 else [],
-                chunk_type=_infer_chunk_type(labels_to_flush),
-            )
-        )
-        chunk_idx += 1
+        chunks.append(_make_chunk(texts_to_flush, labels_to_flush, page_to_use, current_page_bboxes))
         current_texts = []
         current_labels = []
         current_tokens = 0
-        current_bbox = []
+        current_page_bboxes = []
 
     for el in sorted_els:
         label = el.label
@@ -148,19 +176,9 @@ def _chunk_document(
                 atomic_labels = [label]
 
             if atomic_text:
-                chunks.append(
-                    Chunk(
-                        doc_id=doc_id,
-                        version_id="",
-                        chunk_index=chunk_idx,
-                        text=atomic_text,
-                        page=el.page,
-                        section_path=list(section_path),
-                        bbox=el.bbox,
-                        chunk_type=_infer_chunk_type(atomic_labels),
-                    )
-                )
-                chunk_idx += 1
+                # Atomic elements always have their own bbox — never cleared
+                el_page_bboxes = [{"page": el.page, "bbox": el.bbox}] if el.bbox else []
+                chunks.append(_make_chunk([atomic_text], atomic_labels, el.page, el_page_bboxes))
             continue
 
         if not text:
@@ -182,20 +200,12 @@ def _chunk_document(
 
         if token_estimate > max_tokens:
             flush_current()
-            for sub_text in _split_text(text, max_tokens):
-                chunks.append(
-                    Chunk(
-                        doc_id=doc_id,
-                        version_id="",
-                        chunk_index=chunk_idx,
-                        text=sub_text,
-                        page=el.page,
-                        section_path=list(section_path),
-                        bbox=[],
-                        chunk_type=_infer_chunk_type([label]),
-                    )
-                )
-                chunk_idx += 1
+            sub_texts = _split_text(text, max_tokens)
+            for sub_idx, sub_text in enumerate(sub_texts):
+                # First sub-chunk inherits the source element bbox; rest get empty
+                # (can't split bbox without line-level geometry)
+                sub_bboxes = [{"page": el.page, "bbox": el.bbox}] if (sub_idx == 0 and el.bbox) else []
+                chunks.append(_make_chunk([sub_text], [label], el.page, sub_bboxes))
             continue
 
         if current_texts and (current_tokens + token_estimate + pending_tokens > max_tokens):
@@ -212,7 +222,10 @@ def _chunk_document(
 
         if not current_texts:
             current_page = el.page
-            current_bbox = el.bbox
+
+        # Always record bbox regardless of how many sources contribute
+        if el.bbox:
+            current_page_bboxes.append({"page": el.page, "bbox": el.bbox})
 
         current_texts.append(text)
         current_labels.append(label)
