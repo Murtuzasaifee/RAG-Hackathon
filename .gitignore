@@ -10,3 +10,11 @@ wheels/
 .venv
 .env
 agent_session/
+
+# Eval results (generated at runtime)
+eval-results/
+
+# IDE
+.idea/
+.vscode/
+*.swp
