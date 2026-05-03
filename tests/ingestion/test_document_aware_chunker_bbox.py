@@ -30,7 +30,7 @@ def test_title_plus_single_body_chunk_preserves_body_bbox():
     assert chunks[0].bbox == [0.1, 0.2, 0.8, 0.3]
 
 
-def test_multi_body_chunk_does_not_use_single_body_bbox():
+def test_multi_body_chunk_uses_primary_page_bbox_union():
     parsed = ParsedDocument(
         doc_id="doc-1",
         elements=[
@@ -54,4 +54,4 @@ def test_multi_body_chunk_does_not_use_single_body_bbox():
     chunks = DocumentAwareChunker().chunk(parsed)
 
     assert len(chunks) == 1
-    assert chunks[0].bbox == []
+    assert chunks[0].bbox == [0.1, 0.2, 0.8, 0.5]

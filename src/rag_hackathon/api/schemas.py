@@ -51,6 +51,7 @@ class QueryResponse(BaseModel):
     request_id: str
     timings_ms: dict[str, int] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    cache_hit: bool = False
 
 
 class EvalQuestionResult(BaseModel):

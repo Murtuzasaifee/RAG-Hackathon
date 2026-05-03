@@ -5,14 +5,38 @@ const state = {
   pageCount: 0,
   selectedCitation: null,
   citations: [],
+  jobStartedAt: null,
+  jobElapsedTimer: null,
 };
 
 const PDFJS_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
 const PDFJS_WORKER_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
 let pdfjsModulePromise = null;
 
+const JOB_STAGES = [
+  ["queued", "Queued"],
+  ["parsing", "Parsing document"],
+  ["chunking", "Creating chunks"],
+  ["embedding_dense", "Embedding dense vectors"],
+  ["embedding_sparse", "Embedding sparse vectors"],
+  ["indexing", "Indexing in Qdrant"],
+  ["done", "Ready"],
+];
+
+const JOB_DETAIL = {
+  queued: "Queued for background ingestion",
+  parsing: "Azure Document Intelligence is extracting layout and text",
+  chunking: "Building structure-aware chunks with page lineage",
+  embedding_dense: "Creating dense embeddings through Bifrost",
+  embedding_sparse: "Creating SPLADE sparse embeddings",
+  indexing: "Writing chunks and vectors into Qdrant",
+  done: "Ingestion complete. You can query this document now.",
+  failed: "Ingestion failed. Check the error message below.",
+};
+
 const el = {
   healthStatus: document.querySelector("#healthStatus"),
+  serviceLinks: document.querySelector("#serviceLinks"),
   uploadForm: document.querySelector("#uploadForm"),
   fileInput: document.querySelector("#fileInput"),
   docIdInput: document.querySelector("#docIdInput"),
@@ -20,7 +44,10 @@ const el = {
   jobState: document.querySelector("#jobState"),
   jobStage: document.querySelector("#jobStage"),
   jobProgress: document.querySelector("#jobProgress"),
+  jobElapsed: document.querySelector("#jobElapsed"),
   jobBar: document.querySelector("#jobBar"),
+  jobDetail: document.querySelector("#jobDetail"),
+  jobTimeline: document.querySelector("#jobTimeline"),
   jobMeta: document.querySelector("#jobMeta"),
   queryForm: document.querySelector("#queryForm"),
   queryInput: document.querySelector("#queryInput"),
@@ -31,6 +58,7 @@ const el = {
   askButton: document.querySelector("#askButton"),
   answerOutput: document.querySelector("#answerOutput"),
   requestMeta: document.querySelector("#requestMeta"),
+  cacheStatus: document.querySelector("#cacheStatus"),
   warningOutput: document.querySelector("#warningOutput"),
   timingOutput: document.querySelector("#timingOutput"),
   citationList: document.querySelector("#citationList"),
@@ -91,25 +119,95 @@ async function checkHealth() {
   }
 }
 
+async function loadDemoConfig() {
+  try {
+    const config = await requestJson("/demo/config");
+    renderServiceLinks(config);
+  } catch {
+    el.serviceLinks.textContent = "";
+  }
+}
+
+function renderServiceLinks(config) {
+  const links = [
+    ["Bifrost", config.bifrost_url],
+    ["Logfire", config.logfire_project_url],
+  ].filter(([, href]) => href);
+
+  el.serviceLinks.innerHTML = "";
+  for (const [label, href] of links) {
+    const link = document.createElement("a");
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = label;
+    el.serviceLinks.appendChild(link);
+  }
+}
+
 function updateJob(job) {
   el.jobState.textContent = job.state ?? "-";
   el.jobStage.textContent = job.stage ?? "-";
   el.jobProgress.textContent = `${job.progress ?? 0}%`;
   el.jobBar.value = job.progress ?? 0;
+  el.jobElapsed.textContent = state.jobStartedAt ? formatElapsed(Date.now() - state.jobStartedAt) : "-";
+  renderJobTimeline(job.stage, job.state);
+  el.jobDetail.textContent = JOB_DETAIL[job.stage] || JOB_DETAIL[job.state] || "Working";
+  el.jobDetail.classList.toggle("running", job.state === "pending" || job.state === "running");
   el.jobMeta.textContent = `doc_id=${job.doc_id} · version_id=${job.version_id}`;
 }
 
+function startJobClock() {
+  stopJobClock();
+  state.jobElapsedTimer = window.setInterval(() => {
+    if (state.jobStartedAt) {
+      el.jobElapsed.textContent = formatElapsed(Date.now() - state.jobStartedAt);
+    }
+  }, 1000);
+}
+
+function stopJobClock() {
+  if (state.jobElapsedTimer) {
+    window.clearInterval(state.jobElapsedTimer);
+    state.jobElapsedTimer = null;
+  }
+}
+
+function renderJobTimeline(stage, stateValue) {
+  const currentIndex = Math.max(0, JOB_STAGES.findIndex(([key]) => key === stage));
+  el.jobTimeline.innerHTML = "";
+  for (const [key, label] of JOB_STAGES) {
+    const index = JOB_STAGES.findIndex(([candidate]) => candidate === key);
+    const item = document.createElement("li");
+    item.textContent = label;
+    item.className = index < currentIndex || stateValue === "done" ? "done" : "";
+    if (index === currentIndex && stateValue !== "done") {
+      item.className = "active";
+    }
+    el.jobTimeline.appendChild(item);
+  }
+}
+
+function formatElapsed(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
 async function pollJob(jobId) {
-  for (;;) {
+  for (; ;) {
     const job = await requestJson(`/jobs/${encodeURIComponent(jobId)}`);
     updateJob(job);
     if (job.state === "done") {
       el.queryDocIds.value = job.doc_id;
       window.localStorage.setItem("ragDemo.docId", job.doc_id);
       window.localStorage.setItem("ragDemo.versionId", job.version_id);
+      stopJobClock();
       return;
     }
     if (job.state === "failed") {
+      stopJobClock();
       throw new Error(job.error || "Ingestion failed");
     }
     await sleep(1400);
@@ -122,7 +220,18 @@ async function uploadDocument(event) {
   if (!file) return;
 
   state.currentFile = file;
-  await loadPdf(file);
+  state.jobStartedAt = Date.now();
+  startJobClock();
+  updateJob({
+    doc_id: el.docIdInput.value.trim() || file.name,
+    version_id: "pending",
+    state: "pending",
+    stage: "queued",
+    progress: 0,
+  });
+  loadPdf(file).catch(() => {
+    el.pdfMessage.textContent = "PDF preview could not load. Ingestion can continue.";
+  });
 
   const form = new FormData();
   form.append("file", file);
@@ -141,6 +250,10 @@ async function uploadDocument(event) {
   } catch (error) {
     el.jobMeta.textContent = error.message;
     el.jobState.textContent = "Error";
+    el.jobStage.textContent = "failed";
+    el.jobDetail.textContent = JOB_DETAIL.failed;
+    el.jobDetail.classList.remove("running");
+    stopJobClock();
   } finally {
     el.uploadButton.disabled = false;
   }
@@ -171,6 +284,7 @@ async function runQuery(event) {
   el.answerOutput.classList.remove("empty");
   el.answerOutput.textContent = "Thinking...";
   el.requestMeta.textContent = "";
+  el.cacheStatus.hidden = true;
   try {
     const payload = {
       query: el.queryInput.value.trim(),
@@ -187,11 +301,15 @@ async function runQuery(event) {
 
     el.answerOutput.textContent = response.answer || "";
     el.requestMeta.textContent = response.request_id ? `request ${response.request_id}` : "";
+    const cacheHit = Boolean(response.cache_hit || response.timings_ms?.cache_hit);
+    el.cacheStatus.hidden = !cacheHit;
+    el.cacheStatus.textContent = cacheHit ? "Served from cache" : "";
     renderWarnings(response.warnings);
     renderTimings(response.timings_ms);
     renderCitations(response.citations || []);
   } catch (error) {
     el.answerOutput.textContent = error.message;
+    el.cacheStatus.hidden = true;
   } finally {
     el.askButton.disabled = false;
   }
@@ -464,4 +582,6 @@ el.fileInput.addEventListener("change", async () => {
 });
 
 restoreInputs();
+renderJobTimeline("queued", "idle");
+loadDemoConfig();
 checkHealth();

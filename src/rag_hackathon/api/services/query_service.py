@@ -165,6 +165,7 @@ class QueryService:
                     request_id=request_id,
                     timings_ms={"cache_hit": 1},
                     warnings=[],
+                    cache_hit=True,
                 )
             logger.debug("query.cache_miss", request_id=request_id)
 
