@@ -77,6 +77,7 @@ def _chunk_document(
     current_tokens: int = 0
     current_page: int = sorted_els[0].page
     current_bbox: list[float] = []
+    current_bbox_source_count: int = 0
 
     pending_title: str | None = None
     pending_title_label: str | None = None
@@ -85,7 +86,7 @@ def _chunk_document(
     def flush_current() -> None:
         nonlocal current_texts, current_labels, current_tokens, chunk_idx
         nonlocal pending_title, pending_title_label, pending_title_page
-        nonlocal current_page, current_bbox
+        nonlocal current_page, current_bbox, current_bbox_source_count
 
         if not current_texts and pending_title is None:
             return
@@ -116,7 +117,7 @@ def _chunk_document(
                 text="\n\n".join(texts_to_flush),
                 page=page_to_use,
                 section_path=list(section_path),
-                bbox=current_bbox if len(current_texts) == 1 else [],
+                bbox=current_bbox if current_bbox_source_count == 1 else [],
                 chunk_type=_infer_chunk_type(labels_to_flush),
             )
         )
@@ -125,6 +126,7 @@ def _chunk_document(
         current_labels = []
         current_tokens = 0
         current_bbox = []
+        current_bbox_source_count = 0
 
     for el in sorted_els:
         label = el.label
@@ -212,11 +214,14 @@ def _chunk_document(
 
         if not current_texts:
             current_page = el.page
+
+        if current_bbox_source_count == 0:
             current_bbox = el.bbox
 
         current_texts.append(text)
         current_labels.append(label)
         current_tokens += token_estimate
+        current_bbox_source_count += 1
 
         if current_tokens >= max_tokens:
             flush_current()

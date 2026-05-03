@@ -242,6 +242,8 @@ progress {
   display: block;
   max-width: 100%;
   height: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .overlay-layer {
@@ -249,6 +251,7 @@ progress {
   top: 0;
   left: 0;
   pointer-events: none;
+  z-index: 2;
 }
 
 .citation-list {

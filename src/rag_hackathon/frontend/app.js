@@ -333,33 +333,44 @@ async function renderPage(pageNumber, citation = state.selectedCitation) {
   el.nextPageButton.disabled = boundedPage >= state.pageCount;
 
   await page.render({ canvasContext: context, viewport }).promise;
-  drawOverlay(citation, viewport.width, viewport.height);
+  drawOverlay(citation, {
+    renderedWidth: viewport.width,
+    renderedHeight: viewport.height,
+    pdfPointWidth: naturalViewport.width,
+    pdfPointHeight: naturalViewport.height,
+  });
 }
 
 function clearOverlay() {
   el.overlayLayer.innerHTML = "";
 }
 
-function drawOverlay(citation, width, height) {
+function drawOverlay(citation, pageMetrics) {
   clearOverlay();
   const bbox = citation?.bbox || [];
-  if (!bbox.length || citation.page !== state.currentPage) {
+  if (Number(citation?.page) !== state.currentPage) {
     return;
   }
 
-  const normalized = bbox.every((value) => Number.isFinite(value) && value >= 0 && value <= 1.05);
-  if (!normalized) {
-    el.pdfMessage.textContent = "Selected citation has non-normalized bbox; showing metadata only.";
+  if (!bbox.length) {
+    el.pdfMessage.textContent = "Selected citation has no bbox. Re-ingest this PDF to generate overlay-ready citations.";
     return;
   }
 
-  if (bbox.length === 4) {
-    const [x0, y0, x1, y1] = bbox;
+  const normalizedBbox = normalizeOverlayBbox(bbox, pageMetrics);
+  if (!normalizedBbox.length) {
+    el.pdfMessage.textContent = "Selected citation has bbox data that cannot be mapped to this PDF page.";
+    return;
+  }
+  el.pdfMessage.textContent = "";
+
+  if (normalizedBbox.length === 4) {
+    const [x0, y0, x1, y1] = normalizedBbox;
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("x", String(x0 * width));
-    rect.setAttribute("y", String(y0 * height));
-    rect.setAttribute("width", String(Math.max(2, (x1 - x0) * width)));
-    rect.setAttribute("height", String(Math.max(2, (y1 - y0) * height)));
+    rect.setAttribute("x", String(x0 * pageMetrics.renderedWidth));
+    rect.setAttribute("y", String(y0 * pageMetrics.renderedHeight));
+    rect.setAttribute("width", String(Math.max(2, (x1 - x0) * pageMetrics.renderedWidth)));
+    rect.setAttribute("height", String(Math.max(2, (y1 - y0) * pageMetrics.renderedHeight)));
     rect.setAttribute("fill", "rgba(11, 107, 203, 0.18)");
     rect.setAttribute("stroke", "#0b6bcb");
     rect.setAttribute("stroke-width", "2");
@@ -367,10 +378,12 @@ function drawOverlay(citation, width, height) {
     return;
   }
 
-  if (bbox.length >= 8 && bbox.length % 2 === 0) {
+  if (normalizedBbox.length >= 8 && normalizedBbox.length % 2 === 0) {
     const points = [];
-    for (let i = 0; i < bbox.length; i += 2) {
-      points.push(`${bbox[i] * width},${bbox[i + 1] * height}`);
+    for (let i = 0; i < normalizedBbox.length; i += 2) {
+      points.push(
+        `${normalizedBbox[i] * pageMetrics.renderedWidth},${normalizedBbox[i + 1] * pageMetrics.renderedHeight}`,
+      );
     }
     const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
     polygon.setAttribute("points", points.join(" "));
@@ -379,6 +392,53 @@ function drawOverlay(citation, width, height) {
     polygon.setAttribute("stroke-width", "2");
     el.overlayLayer.appendChild(polygon);
   }
+}
+
+function normalizeOverlayBbox(bbox, pageMetrics) {
+  const values = bbox.map(Number);
+  if (!values.every(Number.isFinite)) {
+    return [];
+  }
+
+  const maxValue = Math.max(...values);
+  if (maxValue <= 1.05) {
+    return values.map(clampUnit);
+  }
+
+  const pageInches = {
+    width: pageMetrics.pdfPointWidth / 72,
+    height: pageMetrics.pdfPointHeight / 72,
+  };
+  const looksLikeInches =
+    maxValue <= Math.max(pageInches.width, pageInches.height) * 1.2;
+  const basis = looksLikeInches
+    ? pageInches
+    : { width: pageMetrics.pdfPointWidth, height: pageMetrics.pdfPointHeight };
+
+  if (values.length === 4) {
+    const [x0, y0, x1, y1] = values;
+    return [
+      clampUnit(Math.min(x0, x1) / basis.width),
+      clampUnit(Math.min(y0, y1) / basis.height),
+      clampUnit(Math.max(x0, x1) / basis.width),
+      clampUnit(Math.max(y0, y1) / basis.height),
+    ];
+  }
+
+  if (values.length >= 8 && values.length % 2 === 0) {
+    const normalized = [];
+    for (let i = 0; i < values.length; i += 2) {
+      normalized.push(clampUnit(values[i] / basis.width));
+      normalized.push(clampUnit(values[i + 1] / basis.height));
+    }
+    return normalized;
+  }
+
+  return [];
+}
+
+function clampUnit(value) {
+  return Math.min(1, Math.max(0, value));
 }
 
 async function changePage(delta) {
