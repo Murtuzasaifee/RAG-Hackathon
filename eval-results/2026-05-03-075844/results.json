@@ -1,0 +1,15 @@
+{
+  "aggregate": {},
+  "total_questions": 1,
+  "failed_questions": 1,
+  "elapsed_seconds": 0.0,
+  "per_question": [
+    {
+      "question": "Q?",
+      "answer": "",
+      "n_contexts": 0,
+      "scores": {},
+      "error": "Bifrost down"
+    }
+  ]
+}

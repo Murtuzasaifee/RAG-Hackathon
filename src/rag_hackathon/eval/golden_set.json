@@ -1,0 +1,32 @@
+[
+  {
+    "question": "What is the main purpose of this document?",
+    "expected_answer": "This document outlines the architecture and design decisions for a production-grade RAG backend system.",
+    "doc_ids": [],
+    "expected_chunks": []
+  },
+  {
+    "question": "How does the hybrid retrieval system work?",
+    "expected_answer": "The hybrid retrieval combines dense vector search using OpenAI embeddings with sparse search using Splade, fused via Reciprocal Rank Fusion (RRF) in Qdrant.",
+    "doc_ids": [],
+    "expected_chunks": []
+  },
+  {
+    "question": "What caching layers are used in the system?",
+    "expected_answer": "The system uses three Redis caching layers: query embedding cache, rerank results cache, and final answer cache, each with different TTLs.",
+    "doc_ids": [],
+    "expected_chunks": []
+  },
+  {
+    "question": "How does document versioning work?",
+    "expected_answer": "Document versioning uses payload-based filtering on Qdrant points. Each point carries doc_id, version_id, and active flags. Only active versions are returned by default, but specific versions can be queried explicitly.",
+    "doc_ids": [],
+    "expected_chunks": []
+  },
+  {
+    "question": "What security measures protect the system?",
+    "expected_answer": "The system uses LLM Guard sidecar for input scanning (prompt injection, PII, toxicity) and output scanning (groundedness via NLI). All provider traffic flows through Bifrost AI Gateway.",
+    "doc_ids": [],
+    "expected_chunks": []
+  }
+]

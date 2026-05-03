@@ -49,6 +49,20 @@ class QueryResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class EvalQuestionResult(BaseModel):
+    question: str
+    scores: dict[str, float] = Field(default_factory=dict)
+    error: str | None = None
+
+
+class EvalRunResponse(BaseModel):
+    total_questions: int
+    failed_questions: int
+    elapsed_seconds: float
+    aggregate: dict[str, float] = Field(default_factory=dict)
+    per_question: list[EvalQuestionResult] = Field(default_factory=list)
+
+
 class ErrorResponse(BaseModel):
     error: str
     message: str

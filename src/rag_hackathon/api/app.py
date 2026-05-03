@@ -7,7 +7,7 @@ from fastapi import FastAPI
 
 from rag_hackathon.api.error_handlers import RAGError, rag_error_handler
 from rag_hackathon.api.middleware import RequestIdMiddleware
-from rag_hackathon.api.routers import documents, health, ingest, query
+from rag_hackathon.api.routers import documents, eval, health, ingest, query
 from rag_hackathon.observability.logging import configure_logging
 
 
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(ingest.router)
     app.include_router(query.router)
     app.include_router(documents.router)
+    app.include_router(eval.router)
 
     return app
 
