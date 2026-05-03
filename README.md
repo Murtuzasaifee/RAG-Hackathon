@@ -8,7 +8,7 @@ Production-grade Retrieval-Augmented Generation backend built with Python 3.13 a
 
 ```mermaid
 graph TB
-    Client["Client (curl / SDK)"]
+    Client["Client (curl / SDK / Demo UI)"]
     App["FastAPI App :8000"]
     Logfire["Logfire (traces + logs)"]
 
@@ -93,7 +93,31 @@ docker compose up
 
 # 3. Verify health
 curl http://localhost:8000/health
+
+# 4. Open the demo UI
+http://localhost:8000/demo
 ```
+
+## Demo UI
+
+A lightweight, unauthenticated demo UI is served by the FastAPI app at:
+
+```text
+http://localhost:8000/demo
+```
+
+The UI is intentionally simple and backend-focused:
+
+- Upload a PDF and watch ingestion progress across parsing, chunking, embedding, and indexing.
+- Ask questions against indexed documents.
+- Inspect returned citations with `doc_id`, `version_id`, page, section path, score, bbox, and chunk text.
+- Render the uploaded PDF in the browser and highlight citation bounding boxes when bbox data is available.
+- Show whether a query response was served from Redis answer cache.
+- Link directly to Bifrost and Logfire from the top bar.
+
+PDF preview uses the PDF file selected in the current browser session. If you refresh the page, query/citation metadata still works, but you need to re-select or re-upload the PDF to render the source preview again.
+
+For citation highlights, re-ingest documents after bbox/chunking changes so Qdrant contains overlay-ready citation metadata.
 
 ## Docker Commands & Debugging
 
@@ -233,7 +257,14 @@ Response:
       "page": 3,
       "section_path": ["Introduction", "Architecture"],
       "bbox": [0.1, 0.2, 0.8, 0.4],
+      "page_bboxes": [
+        {
+          "page": 3,
+          "bbox": [0.1, 0.2, 0.8, 0.4]
+        }
+      ],
       "chunk_text": "The caching architecture consists of...",
+      "chunk_type": "text",
       "score": 0.95
     }
   ],
@@ -245,7 +276,8 @@ Response:
     "generate_ms": 340,
     "guard_output_ms": 1800
   },
-  "warnings": []
+  "warnings": [],
+  "cache_hit": false
 }
 ```
 
@@ -309,6 +341,7 @@ Input block → `400` with error details. Output concern → `warnings` array in
 - **Logfire** — distributed traces with per-stage spans (`parse`, `embed.dense`, `embed.sparse`, `retrieve.hybrid`, `rerank`, `generate`, `guard.input`, `guard.output`, `gateway.embed`, `gateway.chat`)
 - **structlog** — JSON-structured logs with request ID correlation, per-stage timing, hit counts, and score breakdowns
 - Every response includes `timings_ms` for full latency breakdown across all pipeline stages
+- The demo UI links to the configured Logfire project from `/demo/config`
 
 ## Configuration
 
@@ -324,6 +357,8 @@ All settings are env-var driven. See `.env.example` for the full list.
 | `LOGFIRE_TOKEN` | Yes | — | Logfire token |
 | `HUGGINGFACE_TOKEN` | No | — | HuggingFace token (required for gated SPLADE v3 model) |
 | `BIFROST_URL` | No | `http://localhost:8080` | Bifrost gateway URL |
+| `BIFROST_PUBLIC_URL` | No | — | Browser-visible Bifrost URL shown in the demo UI; falls back to `BIFROST_URL` |
+| `LOGFIRE_URL` | No | `https://logfire-us.pydantic.dev/msaifee/rag-hackathon` | Logfire project link shown in the demo UI |
 | `LLM_GUARD_URL` | No | `http://localhost:8001` | LLM Guard sidecar URL |
 | `QDRANT_URL` | No | `http://localhost:6333` | Qdrant URL |
 | `REDIS_URL` | No | `redis://localhost:6379/0` | Redis URL |
@@ -376,12 +411,13 @@ This skips sparse embedding and output scanning entirely. Dense-only retrieval w
 ```
 src/rag_hackathon/
 ├── api/                    # FastAPI routes, schemas, middleware
-│   ├── routers/            # ingest, query, documents, health
+│   ├── routers/            # ingest, query, documents, health, demo
 │   ├── services/           # QueryService orchestration
 │   └── schemas.py          # Pydantic request/response models
 ├── cache/                  # Redis cache (3-tier TTL)
 ├── core/                   # Settings, types, errors
 ├── generation/             # Grounded LLM generation
+├── frontend/               # Minimal static demo UI served at /demo
 ├── gateway/                # Bifrost client (embeddings) + MeshAPI direct
 ├── ingestion/              # Parser, chunker, embedders, indexer, jobs
 ├── observability/          # Logfire spans, structlog config
