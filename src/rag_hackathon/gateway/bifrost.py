@@ -12,8 +12,14 @@ logger = structlog.get_logger("rag_hackathon.gateway")
 
 
 class BifrostClient:
-    def __init__(self, base_url: str, api_key: str = "unused") -> None:
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str = "unused",
+        chat_provider: str = "",
+    ) -> None:
         self._base_url = base_url.rstrip("/")
+        self._chat_provider = chat_provider
         self._openai = AsyncOpenAI(
             base_url=f"{self._base_url}/openai/v1",
             api_key=api_key,
@@ -30,10 +36,11 @@ class BifrostClient:
     async def embed(self, texts: list[str], model: str) -> list[list[float]]:
         if not texts:
             return []
-        with stage_span("gateway.embed", model=model, n_texts=len(texts)):
+        routed_model = f"openai/{model}" if not model.startswith("openai/") else model
+        with stage_span("gateway.embed", model=routed_model, n_texts=len(texts)):
             try:
                 resp = await self._openai.embeddings.create(
-                    input=texts, model=model
+                    input=texts, model=routed_model
                 )
                 return [d.embedding for d in resp.data]
             except Exception as exc:
@@ -45,10 +52,11 @@ class BifrostClient:
         model: str,
         **opts: object,
     ) -> str:
-        with stage_span("gateway.chat", model=model):
+        routed_model = f"{self._chat_provider}/{model}" if self._chat_provider else model
+        with stage_span("gateway.chat", model=routed_model):
             try:
                 resp = await self._openai.chat.completions.create(
-                    model=model,
+                    model=routed_model,
                     messages=messages,
                 )
                 content = resp.choices[0].message.content

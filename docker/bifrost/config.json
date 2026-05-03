@@ -1,12 +1,50 @@
 {
   "providers": {
     "openai": {
-      "type": "openai",
-      "api_key": "${OPENAI_API_KEY}"
+      "keys": [
+        {
+          "name": "openai-key",
+          "value": "env.OPENAI_API_KEY",
+          "models": [
+            "*"
+          ],
+          "weight": 1.0
+        }
+      ]
+    },
+    "meshapi": {
+      "keys": [
+        {
+          "name": "meshapi-key",
+          "value": "env.MESH_API_KEY",
+          "models": [
+            "*"
+          ],
+          "weight": 1.0
+        }
+      ],
+      "network_config": {
+        "base_url": "https://api.meshapi.ai"
+      },
+      "custom_provider_config": {
+        "base_provider_type": "openai",
+        "allowed_requests": {
+          "chat_completion": true,
+          "chat_completion_stream": true
+        }
+      }
     },
     "cohere": {
-      "type": "cohere",
-      "api_key": "${COHERE_API_KEY}"
+      "keys": [
+        {
+          "name": "cohere-key",
+          "value": "env.COHERE_API_KEY",
+          "models": [
+            "*"
+          ],
+          "weight": 1.0
+        }
+      ]
     }
   },
   "server": {

@@ -87,7 +87,7 @@ async def _run_ingest_pipeline(
                     SpladeSparseEmbedder,
                 )
 
-                sparse_embedder = SpladeSparseEmbedder(settings.splade_doc_model)
+                sparse_embedder = SpladeSparseEmbedder(settings.splade_model, hf_token=settings.huggingface_token)
                 sparse_vectors = await sparse_embedder.embed(texts)
 
             await _update("running", "indexing", 80)

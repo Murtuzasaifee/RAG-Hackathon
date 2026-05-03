@@ -9,18 +9,19 @@ logger = structlog.get_logger("rag_hackathon.ingestion.embedders.sparse")
 
 
 class SpladeSparseEmbedder:
-    def __init__(self, model_name: str) -> None:
+    def __init__(self, model_name: str, hf_token: str | None = None) -> None:
         self._model_name = model_name
+        self._hf_token = hf_token
         self._model = None
         self._tokenizer = None
 
-    def _load(self) -> None:
+    def _load(self, hf_token: str | None = None) -> None:
         if self._model is not None:
             return
         from transformers import AutoModelForMaskedLM, AutoTokenizer
 
-        self._tokenizer = AutoTokenizer.from_pretrained(self._model_name)
-        self._model = AutoModelForMaskedLM.from_pretrained(self._model_name)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._model_name, token=hf_token)
+        self._model = AutoModelForMaskedLM.from_pretrained(self._model_name, token=hf_token)
         self._model.eval()
 
     def _compute_sparse(self, text: str) -> SparseVector:
@@ -47,6 +48,6 @@ class SpladeSparseEmbedder:
     async def embed(self, texts: list[str]) -> list[SparseVector]:
         if not texts:
             return []
-        self._load()
+        self._load(self._hf_token)
         with stage_span("embed.sparse", model=self._model_name, n=len(texts)):
             return [self._compute_sparse(text) for text in texts]

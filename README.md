@@ -65,7 +65,7 @@ graph TB
 | Document parsing | Azure Document Intelligence | Structure + bbox extraction |
 | Chunking | Structure-Aware Chunker | Section-bounded + table-as-chunk |
 | Dense embeddings | OpenAI `text-embedding-3-small` | 1536-dim cosine vectors |
-| Sparse embeddings | Splade (local) | Sparse lexical vectors |
+| Sparse embeddings | SPLADE v3 (local) | Single symmetric sparse model |
 | Vector store | Qdrant | Named vectors + RRF fusion |
 | Reranking | Cohere `rerank-english-v3.0` | Cross-encoder re-scoring |
 | Generation | GPT (via Bifrost) | Grounded answer synthesis |
@@ -98,6 +98,75 @@ docker compose up
 curl http://localhost:8000/health
 ```
 
+## Docker Commands & Debugging
+
+Here are some useful Docker commands to help you run, manage, and debug the application stack locally:
+
+### Running the Stack
+- **Start all containers in the background (detached mode):**
+  ```bash
+  docker compose up -d
+  ```
+- **Stop all containers gracefully:**
+  ```bash
+  docker compose down
+  ```
+- **Stop containers and completely wipe all persistent data (Qdrant & Redis volumes):**
+  ```bash
+  docker compose down -v
+  ```
+- **Rebuild the FastAPI app image (run this if you modify code or install new packages):**
+  ```bash
+  docker compose up -d --build app
+  ```
+  > **Note on Caching:** `docker compose down` followed by `up` will reuse cached image layers — it does **NOT** re-run `uv sync` inside the container unless you force a rebuild. If you change dependencies and things aren't updating, do a clean build:
+  ```bash
+  docker compose build --no-cache app
+  docker compose up
+  ```
+
+### Running App Locally (Sidecars in Docker)
+To iterate faster without building the Docker image every time, you can start only the sidecars via Compose and run the FastAPI app directly:
+
+```bash
+docker compose up qdrant redis bifrost llm-guard -d
+uv run uvicorn rag_hackathon.api.app:app --reload
+```
+> **Note:** The app reads `.env` for sidecar URLs. When running locally, you must swap your `_URL` variables to their `localhost` variants (these are already provided as comments in your `.env.example`).
+
+### Checking Logs
+When a container fails or requests drop, checking the logs is the first step:
+
+- **View logs for all containers (live tail):**
+  ```bash
+  docker compose logs -f
+  ```
+- **View logs for the main FastAPI backend:**
+  ```bash
+  docker compose logs -f app
+  ```
+- **View logs for Bifrost AI Gateway:**
+  ```bash
+  docker compose logs -f bifrost
+  ```
+- **View logs for LLM Guard (security sidecar):**
+  ```bash
+  docker compose logs -f llm-guard
+  ```
+- **View logs for Qdrant Vector DB:**
+  ```bash
+  docker compose logs -f qdrant
+  ```
+
+### Executing & Inspecting
+- **Check the status and health of all running containers:**
+  ```bash
+  docker compose ps
+  ```
+- **Open a bash shell directly inside the running app container:**
+  ```bash
+  docker compose exec app bash
+  ```
 The stack takes ~60s to become healthy. All five services (app, Qdrant, Redis, Bifrost, LLM Guard) must pass health checks before the app accepts traffic.
 
 ## API Reference
@@ -274,7 +343,8 @@ All settings are env-var driven. See `.env.example` for the full list.
 |----------|----------|---------|-------------|
 | `AZURE_DI_ENDPOINT` | Yes | — | Azure DI resource endpoint |
 | `AZURE_DI_KEY` | Yes | — | Azure DI API key |
-| `OPENAI_API_KEY` | Yes | — | OpenAI API key |
+| `OPENAI_API_KEY` | Yes | — | OpenAI API key (used by Bifrost) |
+| `OPENAI_BASE_URL` | No | `""` | OpenAI-compatible base URL routed through Bifrost (e.g. `https://api.meshapi.ai`) |
 | `COHERE_API_KEY` | Yes | — | Cohere API key |
 | `LOGFIRE_TOKEN` | Yes | — | Logfire token |
 | `BIFROST_URL` | No | `http://localhost:8080` | Bifrost gateway URL |

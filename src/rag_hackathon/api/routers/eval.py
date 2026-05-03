@@ -11,10 +11,14 @@ _last_report: EvalReport | None = None
 
 
 async def _run_eval_background() -> EvalReport:
+    from qdrant_client import AsyncQdrantClient
+
     from rag_hackathon.api.services.query_service import QueryService
     from rag_hackathon.core.settings import get_settings
     from rag_hackathon.gateway.bifrost import BifrostClient
     from rag_hackathon.generation.generator import GroundedGenerator
+    from rag_hackathon.ingestion.embedders.openai_dense import OpenAIDenseEmbedder
+    from rag_hackathon.ingestion.embedders.splade_sparse import SpladeSparseEmbedder
     from rag_hackathon.retrieval.hybrid_qdrant import HybridQdrantRetriever
     from rag_hackathon.retrieval.reranker_cohere import CohereReranker
 
@@ -23,13 +27,22 @@ async def _run_eval_background() -> EvalReport:
     bifrost = BifrostClient(
         base_url=settings.bifrost_url,
         api_key=settings.openai_api_key,
+        chat_provider=settings.llm_provider,
     )
+    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
     try:
+        dense = OpenAIDenseEmbedder(bifrost, settings.embedding_model)
+        sparse = (
+            SpladeSparseEmbedder(settings.splade_model, hf_token=settings.huggingface_token)
+            if settings.sparse_enabled
+            else None
+        )
         retriever = HybridQdrantRetriever(
-            qdrant_url=settings.qdrant_url,
+            client=qdrant,
             collection=settings.qdrant_collection,
+            dense_embedder=dense,
+            sparse_embedder=sparse,
             rrf_k=settings.rrf_k,
-            sparse_enabled=settings.sparse_enabled,
         )
         reranker = CohereReranker(bifrost, settings.rerank_model)
         generator = GroundedGenerator(bifrost, settings.llm_model)
@@ -43,6 +56,7 @@ async def _run_eval_background() -> EvalReport:
         return await run_eval(query_service)
     finally:
         await bifrost.close()
+        await qdrant.close()
 
 
 @router.post("/run", response_model=EvalRunResponse)
