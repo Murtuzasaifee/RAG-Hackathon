@@ -38,6 +38,7 @@ class CitationResponse(BaseModel):
     section_path: list[str] = Field(default_factory=list)
     bbox: list[float] = Field(default_factory=list)
     chunk_text: str
+    chunk_type: str = "text"
     score: float
 
 

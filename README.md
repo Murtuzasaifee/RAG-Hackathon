@@ -10,35 +10,35 @@ Production-grade Retrieval-Augmented Generation backend built with Python 3.13 a
 graph TB
     Client["Client (curl / SDK)"]
     App["FastAPI App :8000"]
+    Logfire["Logfire (traces + logs)"]
 
     subgraph Ingestion
         ADI["Azure Document Intelligence"]
-        Chunker["Structure-Aware Chunker"]
-        DenseEmb["OpenAI Dense Embeddings"]
-        SparseEmb["Splade Sparse Embeddings"]
+        Chunker["Document-Aware Chunker"]
+        DenseEmb["Dense Embeddings (OpenAI)"]
+        SparseEmb["SPLADE v3 Sparse Embeddings (local)"]
         Qdrant["Qdrant (dense + sparse vectors)"]
     end
 
-    subgraph Retrieval
+    subgraph Retrieval & Generation
         Hybrid["Hybrid RRF Fusion"]
-        Reranker["Cohere Rerank"]
-        Generator["LLM Generation"]
+        Reranker["Cohere Rerank (direct)"]
+        Generator["LLM Generation (MeshAPI direct)"]
     end
 
     subgraph Security
-        GuardIn["LLM Guard — Input Scan"]
-        GuardOut["LLM Guard — Output Scan"]
+        GuardIn["LLM Guard — Input Scan (mandatory)"]
+        GuardOut["LLM Guard — Output Scan (optional)"]
     end
 
     subgraph Caching
         Redis["Redis Cache (3 layers)"]
     end
 
-    subgraph Eval
-        RAGAS["RAGAS Eval (faithfulness, precision, relevancy)"]
-    end
-
-    Bifrost["Bifrost AI Gateway"]
+    Bifrost["Bifrost AI Gateway (embeddings only)"]
+    OpenAI["OpenAI API"]
+    MeshAPI["MeshAPI"]
+    Cohere["Cohere API"]
 
     Client --> App
     App --> GuardIn
@@ -48,13 +48,10 @@ graph TB
     Chunker --> SparseEmb --> Qdrant
     Hybrid --> Reranker --> Generator --> GuardOut
     GuardOut --> Redis
-    App --> RAGAS
-    DenseEmb --> Bifrost
-    Reranker --> Bifrost
-    Generator --> Bifrost
-    RAGAS --> Bifrost
-    Bifrost --> OpenAI["OpenAI API"]
-    Bifrost --> Cohere["Cohere API"]
+    DenseEmb --> Bifrost --> OpenAI
+    Reranker --> Cohere
+    Generator --> MeshAPI
+    App --> Logfire
 ```
 
 ### Stack
@@ -63,25 +60,25 @@ graph TB
 |-----------|-----------|---------|
 | API server | FastAPI (async) | REST endpoints |
 | Document parsing | Azure Document Intelligence | Structure + bbox extraction |
-| Chunking | Structure-Aware Chunker | Section-bounded + table-as-chunk |
-| Dense embeddings | OpenAI `text-embedding-3-small` | 1536-dim cosine vectors |
-| Sparse embeddings | SPLADE v3 (local) | Single symmetric sparse model |
+| Chunking | Document-Aware Chunker | Section-bounded, atomic elements, cross-page context |
+| Dense embeddings | OpenAI `text-embedding-3-small` via Bifrost | 1536-dim cosine vectors |
+| Sparse embeddings | SPLADE v3 (local CPU) | Symmetric sparse model for hybrid retrieval |
 | Vector store | Qdrant | Named vectors + RRF fusion |
-| Reranking | Cohere `rerank-english-v3.0` | Cross-encoder re-scoring |
-| Generation | GPT (via Bifrost) | Grounded answer synthesis |
-| Security | LLM Guard sidecar | Input/output scanning |
-| Gateway | Bifrost AI Gateway | Proxies all provider traffic |
+| Reranking | Cohere `rerank-english-v3.0` (direct) | Cross-encoder re-scoring |
+| Generation | MeshAPI (direct, OpenAI-compatible) | Grounded answer synthesis |
+| Security | LLM Guard sidecar | Input scanning (mandatory), output groundedness (optional) |
+| Gateway | Bifrost AI Gateway | Proxies OpenAI embedding traffic only |
 | Caching | Redis | 3-tier TTL cache |
 | Observability | Logfire + structlog | JSON logs + distributed traces |
-| Eval | RAGAS | Faithfulness, context precision, answer relevancy |
 
 ## Prerequisites
 
 - Docker + Docker Compose
 - API keys:
   - [Azure Document Intelligence](https://portal.azure.com/#create/Microsoft.CognitiveServicesFormRecognizer)
-  - [OpenAI](https://platform.openai.com/api-keys)
-  - [Cohere](https://dashboard.cohere.com/api-keys)
+  - [OpenAI](https://platform.openai.com/api-keys) — embeddings via Bifrost
+  - [MeshAPI](https://meshapi.ai) — LLM generation (direct)
+  - [Cohere](https://dashboard.cohere.com/api-keys) — reranking (direct)
   - [Logfire](https://logfire.pydantic.dev/) (free tier works)
 
 ## Quickstart
@@ -99,8 +96,6 @@ curl http://localhost:8000/health
 ```
 
 ## Docker Commands & Debugging
-
-Here are some useful Docker commands to help you run, manage, and debug the application stack locally:
 
 ### Running the Stack
 - **Start all containers in the background (detached mode):**
@@ -126,17 +121,15 @@ Here are some useful Docker commands to help you run, manage, and debug the appl
   ```
 
 ### Running App Locally (Sidecars in Docker)
-To iterate faster without building the Docker image every time, you can start only the sidecars via Compose and run the FastAPI app directly:
+To iterate faster without building the Docker image every time, start only sidecars via Compose and run the FastAPI app directly:
 
 ```bash
 docker compose up qdrant redis bifrost llm-guard -d
 uv run uvicorn rag_hackathon.api.app:app --reload
 ```
-> **Note:** The app reads `.env` for sidecar URLs. When running locally, you must swap your `_URL` variables to their `localhost` variants (these are already provided as comments in your `.env.example`).
+> **Note:** The app reads `.env` for sidecar URLs. When running locally, swap your `_URL` variables to their `localhost` variants (provided as comments in `.env.example`).
 
 ### Checking Logs
-When a container fails or requests drop, checking the logs is the first step:
-
 - **View logs for all containers (live tail):**
   ```bash
   docker compose logs -f
@@ -153,10 +146,6 @@ When a container fails or requests drop, checking the logs is the first step:
   ```bash
   docker compose logs -f llm-guard
   ```
-- **View logs for Qdrant Vector DB:**
-  ```bash
-  docker compose logs -f qdrant
-  ```
 
 ### Executing & Inspecting
 - **Check the status and health of all running containers:**
@@ -167,6 +156,7 @@ When a container fails or requests drop, checking the logs is the first step:
   ```bash
   docker compose exec app bash
   ```
+
 The stack takes ~60s to become healthy. All five services (app, Qdrant, Redis, Bifrost, LLM Guard) must pass health checks before the app accepts traffic.
 
 ## API Reference
@@ -248,7 +238,13 @@ Response:
     }
   ],
   "request_id": "abc-123",
-  "timings_ms": {"retrieve_ms": 120, "rerank_ms": 85, "generate_ms": 340},
+  "timings_ms": {
+    "guard_input_ms": 45,
+    "retrieve_ms": 120,
+    "rerank_ms": 85,
+    "generate_ms": 340,
+    "guard_output_ms": 1800
+  },
   "warnings": []
 }
 ```
@@ -284,31 +280,6 @@ curl -X DELETE "http://localhost:8000/documents/my-doc-1?mode=hard"
 curl -X DELETE "http://localhost:8000/documents/my-doc-1?mode=soft&version_id=01J..."
 ```
 
-### `POST /eval/run`
-
-Run RAGAS evaluation (faithfulness, context_precision, answer_relevancy) against the bundled golden set.
-
-```bash
-curl -X POST http://localhost:8000/eval/run -H "X-Request-Id: $(uuidgen)"
-```
-
-Response:
-```json
-{
-  "total_questions": 5,
-  "failed_questions": 0,
-  "elapsed_seconds": 12.4,
-  "aggregate": {
-    "faithfulness": 0.85,
-    "context_precision": 0.78,
-    "answer_relevancy": 0.91
-  },
-  "per_question": [...]
-}
-```
-
-Results are also persisted to `eval-results/YYYY-MM-DD-HHMMSS/` as JSON + Markdown.
-
 ### `GET /health`
 
 Health check endpoint. Returns `{"status": "ok"}`.
@@ -324,16 +295,20 @@ All Qdrant points carry `(doc_id, version_id, active)` payload. Default retrieva
 
 ## Security
 
-- **Input scanning:** Prompt injection, PII anonymization, toxicity, banned topics, token limits
-- **Output scanning:** Factual consistency (NLI), sensitive content, relevance
-- Input block → `400` with error details
-- Output concern → `warnings` array in response (does not block)
+Two-layer scanning via LLM Guard sidecar (CPU inference, lazy model load):
+
+- **Input scanning (mandatory):** Prompt injection detection, token limit enforcement
+- **Output scanning (optional, enabled via `LLM_GUARD_OUTPUT_ENABLED`):** Factual consistency check via NLI (FactualConsistency scanner)
+
+Input block → `400` with error details. Output concern → `warnings` array in response (does not block). Both layers fail-open on timeout or sidecar unavailability.
+
+> LLM Guard NLI inference is slow on CPU (~30–120s). Disable output scanning with `LLM_GUARD_OUTPUT_ENABLED=false` for faster iteration.
 
 ## Observability
 
-- **Logfire** — distributed traces with per-stage spans (`parse`, `retrieve.hybrid`, `rerank`, `generate`, `guard.input`, `guard.output`)
-- **structlog** — JSON-structured logs with request ID correlation
-- Every response includes `timings_ms` for latency breakdown
+- **Logfire** — distributed traces with per-stage spans (`parse`, `embed.dense`, `embed.sparse`, `retrieve.hybrid`, `rerank`, `generate`, `guard.input`, `guard.output`, `gateway.embed`, `gateway.chat`)
+- **structlog** — JSON-structured logs with request ID correlation, per-stage timing, hit counts, and score breakdowns
+- Every response includes `timings_ms` for full latency breakdown across all pipeline stages
 
 ## Configuration
 
@@ -343,16 +318,20 @@ All settings are env-var driven. See `.env.example` for the full list.
 |----------|----------|---------|-------------|
 | `AZURE_DI_ENDPOINT` | Yes | — | Azure DI resource endpoint |
 | `AZURE_DI_KEY` | Yes | — | Azure DI API key |
-| `OPENAI_API_KEY` | Yes | — | OpenAI API key (used by Bifrost) |
-| `OPENAI_BASE_URL` | No | `""` | OpenAI-compatible base URL routed through Bifrost (e.g. `https://api.meshapi.ai`) |
-| `COHERE_API_KEY` | Yes | — | Cohere API key |
+| `OPENAI_API_KEY` | Yes | — | OpenAI API key (used by Bifrost for embeddings) |
+| `MESH_API_KEY` | Yes | — | MeshAPI key for LLM generation (direct) |
+| `COHERE_API_KEY` | Yes | — | Cohere API key for reranking (direct) |
 | `LOGFIRE_TOKEN` | Yes | — | Logfire token |
+| `HUGGINGFACE_TOKEN` | No | — | HuggingFace token (required for gated SPLADE v3 model) |
 | `BIFROST_URL` | No | `http://localhost:8080` | Bifrost gateway URL |
 | `LLM_GUARD_URL` | No | `http://localhost:8001` | LLM Guard sidecar URL |
 | `QDRANT_URL` | No | `http://localhost:6333` | Qdrant URL |
 | `REDIS_URL` | No | `redis://localhost:6379/0` | Redis URL |
 | `LLM_MODEL` | No | `gpt-5.4` | LLM model for generation |
+| `LLM_PROVIDER` | No | `meshapi` | LLM provider (`meshapi` or `openai`) |
 | `SPARSE_ENABLED` | No | `true` | Enable/disable sparse channel |
+| `LLM_GUARD_OUTPUT_ENABLED` | No | `true` | Enable/disable output groundedness scanning |
+| `CHUNK_MAX_TOKENS` | No | `512` | Max tokens per chunk |
 | `CACHE_TTL_ANSWER` | No | `3600` | Answer cache TTL (seconds) |
 
 ## Running Tests
@@ -372,11 +351,13 @@ uv run ruff check src/ tests/
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| App crashes on start | Missing required env vars | Check all 5 required keys in `.env` |
-| Splade OOM on low-RAM machines | SPLADE model loads into memory | Set `SPARSE_ENABLED=false` in `.env` |
-| Bifrost health check fails | Bifrost image pull or config error | Check `docker/bifrost/config.json` has valid provider keys |
-| LLM Guard OOM | FactualConsistency is memory-heavy | Remove `FactualConsistency` from `docker/llm-guard/scanners.yml` |
-| Ingest stuck at `embedding_sparse` | First Splade run downloads model | Wait; subsequent runs use cached model |
+| App crashes on start | Missing required env vars | Ensure all 6 required keys are in `.env` |
+| Bifrost embedding fails "no keys found" | `OPENAI_API_KEY` not set or Bifrost config wildcard | Check `docker/bifrost/config.json` and that `OPENAI_API_KEY` is set |
+| SPLADE 401 on load | Gated HuggingFace repo | Set `HUGGINGFACE_TOKEN=hf_...` in `.env` |
+| SPLADE OOM on low-RAM machines | SPLADE model loads ~1 GB into memory | Set `SPARSE_ENABLED=false` in `.env` |
+| LLM Guard container killed | OOM — too many NLP models loaded | Memory capped at 4 GB in compose; reduce further if needed |
+| LLM Guard timeout (ReadTimeout) | NLI inference slow on CPU | Disable output scan: `LLM_GUARD_OUTPUT_ENABLED=false` |
+| Ingest stuck at `embedding_sparse` | First SPLADE run downloads model (~500 MB) | Wait; subsequent runs use cached model |
 | Cache misses after version flip | Expected — version hash changes | Normal behavior; cache rebuilds on next query |
 
 ## Low-Memory Mode
@@ -385,23 +366,23 @@ For machines with <16 GB RAM, set in `.env`:
 
 ```bash
 SPARSE_ENABLED=false
+LLM_GUARD_OUTPUT_ENABLED=false
 ```
 
-This skips sparse embedding at both ingest and retrieve, falling back to dense-only retrieval. No code changes required.
+This skips sparse embedding and output scanning entirely. Dense-only retrieval with input-only guard scanning.
 
 ## Project Structure
 
 ```
 src/rag_hackathon/
 ├── api/                    # FastAPI routes, schemas, middleware
-│   ├── routers/            # ingest, query, documents, eval, health
+│   ├── routers/            # ingest, query, documents, health
 │   ├── services/           # QueryService orchestration
 │   └── schemas.py          # Pydantic request/response models
 ├── cache/                  # Redis cache (3-tier TTL)
 ├── core/                   # Settings, types, errors
-├── eval/                   # RAGAS eval runner + golden set
 ├── generation/             # Grounded LLM generation
-├── gateway/                # Bifrost AI Gateway client
+├── gateway/                # Bifrost client (embeddings) + MeshAPI direct
 ├── ingestion/              # Parser, chunker, embedders, indexer, jobs
 ├── observability/          # Logfire spans, structlog config
 ├── retrieval/              # Hybrid Qdrant retriever, Cohere reranker

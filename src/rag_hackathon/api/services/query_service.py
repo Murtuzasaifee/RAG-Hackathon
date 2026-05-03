@@ -271,6 +271,7 @@ class QueryService:
                 section_path=list(c.section_path),
                 bbox=list(c.bbox),
                 chunk_text=c.chunk_text,
+                chunk_type=c.chunk_type,
                 score=c.score,
             )
             for c in answer.citations

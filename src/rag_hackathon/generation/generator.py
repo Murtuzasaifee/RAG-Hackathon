@@ -33,6 +33,7 @@ class GroundedGenerator:
 
         with stage_span("generate", model=self._model, n_hits=len(hits)):
             messages = build_messages(query, hits_to_dicts(hits))
+            logger.info("generate", query=query, hits=hits_to_dicts(hits))
             try:
                 text = await self._client.chat(messages, self._model)
             except Exception as exc:
