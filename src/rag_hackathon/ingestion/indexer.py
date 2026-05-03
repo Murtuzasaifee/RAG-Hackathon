@@ -72,6 +72,7 @@ class QdrantIndexer:
                             "page": chunk.page,
                             "section_path": chunk.section_path,
                             "bbox": chunk.bbox,
+                            "page_bboxes": chunk.page_bboxes,
                             "chunk_text": chunk.text,
                             "chunk_type": chunk.chunk_type,
                             "chunk_index": chunk.chunk_index,

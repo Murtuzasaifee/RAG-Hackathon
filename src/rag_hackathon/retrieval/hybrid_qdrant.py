@@ -111,6 +111,7 @@ class HybridQdrantRetriever:
                         page=p.get("page", 0),
                         section_path=p.get("section_path", []),
                         bbox=p.get("bbox", []),
+                        page_bboxes=p.get("page_bboxes", []),
                         chunk_type=p.get("chunk_type", "text"),
                         score=point.score or 0.0,
                     )

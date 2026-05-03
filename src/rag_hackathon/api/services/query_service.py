@@ -270,6 +270,7 @@ class QueryService:
                 page=c.page,
                 section_path=list(c.section_path),
                 bbox=list(c.bbox),
+                page_bboxes=list(c.page_bboxes),
                 chunk_text=c.chunk_text,
                 chunk_type=c.chunk_type,
                 score=c.score,
