@@ -22,8 +22,8 @@ graph TB
 
     subgraph Retrieval & Generation
         Hybrid["Hybrid RRF Fusion"]
-        Reranker["Cohere Rerank (direct)"]
-        Generator["LLM Generation (MeshAPI direct)"]
+        Reranker["Cohere Rerank (via Bifrost)"]
+        Generator["LLM Generation (MeshAPI via Bifrost)"]
     end
 
     subgraph Security
@@ -35,10 +35,11 @@ graph TB
         Redis["Redis Cache (3 layers)"]
     end
 
-    Bifrost["Bifrost AI Gateway (embeddings only)"]
-    OpenAI["OpenAI API"]
-    MeshAPI["MeshAPI"]
-    Cohere["Cohere API"]
+    subgraph Bifrost["Bifrost AI Gateway (all provider traffic)"]
+        BifrostOpenAI["openai/ → OpenAI API"]
+        BifrostMeshAPI["meshapi/ → MeshAPI (custom provider)"]
+        BifrostCohere["cohere/ → Cohere API"]
+    end
 
     Client --> App
     App --> GuardIn
@@ -48,9 +49,9 @@ graph TB
     Chunker --> SparseEmb --> Qdrant
     Hybrid --> Reranker --> Generator --> GuardOut
     GuardOut --> Redis
-    DenseEmb --> Bifrost --> OpenAI
-    Reranker --> Cohere
-    Generator --> MeshAPI
+    DenseEmb --> BifrostOpenAI
+    Reranker --> BifrostCohere
+    Generator --> BifrostMeshAPI
     App --> Logfire
 ```
 
@@ -64,10 +65,10 @@ graph TB
 | Dense embeddings | OpenAI `text-embedding-3-small` via Bifrost | 1536-dim cosine vectors |
 | Sparse embeddings | SPLADE v3 (local CPU) | Symmetric sparse model for hybrid retrieval |
 | Vector store | Qdrant | Named vectors + RRF fusion |
-| Reranking | Cohere `rerank-english-v3.0` (direct) | Cross-encoder re-scoring |
-| Generation | MeshAPI (direct, OpenAI-compatible) | Grounded answer synthesis |
+| Reranking | Cohere `rerank-english-v3.0` via Bifrost | Cross-encoder re-scoring |
+| Generation | MeshAPI `gpt-5.4` via Bifrost custom provider | Grounded answer synthesis |
 | Security | LLM Guard sidecar | Input scanning (mandatory), output groundedness (optional) |
-| Gateway | Bifrost AI Gateway | Proxies OpenAI embedding traffic only |
+| Gateway | Bifrost AI Gateway | Unified gateway for all provider traffic (OpenAI, MeshAPI, Cohere) |
 | Caching | Redis | 3-tier TTL cache |
 | Observability | Logfire + structlog | JSON logs + distributed traces |
 
@@ -77,8 +78,8 @@ graph TB
 - API keys:
   - [Azure Document Intelligence](https://portal.azure.com/#create/Microsoft.CognitiveServicesFormRecognizer)
   - [OpenAI](https://platform.openai.com/api-keys) — embeddings via Bifrost
-  - [MeshAPI](https://meshapi.ai) — LLM generation (direct)
-  - [Cohere](https://dashboard.cohere.com/api-keys) — reranking (direct)
+  - [MeshAPI](https://meshapi.ai) — LLM generation via Bifrost custom provider
+  - [Cohere](https://dashboard.cohere.com/api-keys) — reranking via Bifrost
   - [Logfire](https://logfire.pydantic.dev/) (free tier works)
 
 ## Quickstart
@@ -352,8 +353,8 @@ All settings are env-var driven. See `.env.example` for the full list.
 | `AZURE_DI_ENDPOINT` | Yes | — | Azure DI resource endpoint |
 | `AZURE_DI_KEY` | Yes | — | Azure DI API key |
 | `OPENAI_API_KEY` | Yes | — | OpenAI API key (used by Bifrost for embeddings) |
-| `MESH_API_KEY` | Yes | — | MeshAPI key for LLM generation (direct) |
-| `COHERE_API_KEY` | Yes | — | Cohere API key for reranking (direct) |
+| `MESH_API_KEY` | Yes | — | MeshAPI key — read by Bifrost for LLM generation (custom provider) |
+| `COHERE_API_KEY` | Yes | — | Cohere API key — read by Bifrost for reranking |
 | `LOGFIRE_TOKEN` | Yes | — | Logfire token |
 | `HUGGINGFACE_TOKEN` | No | — | HuggingFace token (required for gated SPLADE v3 model) |
 | `BIFROST_URL` | No | `http://localhost:8080` | Bifrost gateway URL |
@@ -387,7 +388,7 @@ uv run ruff check src/ tests/
 | Issue | Cause | Fix |
 |-------|-------|-----|
 | App crashes on start | Missing required env vars | Ensure all 6 required keys are in `.env` |
-| Bifrost embedding fails "no keys found" | `OPENAI_API_KEY` not set or Bifrost config wildcard | Check `docker/bifrost/config.json` and that `OPENAI_API_KEY` is set |
+| Bifrost call fails "no keys found" | API key env var not set, or model not in explicit allowlist | Check `docker/bifrost/config.json` model lists and that all three keys (`OPENAI_API_KEY`, `MESH_API_KEY`, `COHERE_API_KEY`) are in `.env` |
 | SPLADE 401 on load | Gated HuggingFace repo | Set `HUGGINGFACE_TOKEN=hf_...` in `.env` |
 | SPLADE OOM on low-RAM machines | SPLADE model loads ~1 GB into memory | Set `SPARSE_ENABLED=false` in `.env` |
 | LLM Guard container killed | OOM — too many NLP models loaded | Memory capped at 4 GB in compose; reduce further if needed |
@@ -418,7 +419,7 @@ src/rag_hackathon/
 ├── core/                   # Settings, types, errors
 ├── generation/             # Grounded LLM generation
 ├── frontend/               # Minimal static demo UI served at /demo
-├── gateway/                # Bifrost client (embeddings) + MeshAPI direct
+├── gateway/                # Bifrost client (embeddings + chat + rerank — all providers)
 ├── ingestion/              # Parser, chunker, embedders, indexer, jobs
 ├── observability/          # Logfire spans, structlog config
 ├── retrieval/              # Hybrid Qdrant retriever, Cohere reranker
