@@ -12,6 +12,49 @@
           "weight": 1.0
         }
       ]
+    },
+    "cohere": {
+      "keys": [
+        {
+          "name": "cohere-key",
+          "value": "env.COHERE_API_KEY",
+          "models": [
+            "rerank-english-v3.0",
+            "rerank-multilingual-v3.0",
+            "rerank-v3.5",
+            "rerank-v4.0-fast"
+          ],
+          "weight": 1.0
+        }
+      ]
+    },
+    "meshapi": {
+      "keys": [
+        {
+          "name": "meshapi-key",
+          "value": "env.MESH_API_KEY",
+          "models": [
+            "openai/gpt-5.4",
+            "openai/gpt-5.4-mini",
+            "openai/gpt-5.4-nano",
+            "openai/gpt-5.4-pro",
+            "openai/gpt-4.1",
+            "openai/gpt-4o",
+            "openai/gpt-4o-mini"
+          ],
+          "weight": 1.0
+        }
+      ],
+      "network_config": {
+        "base_url": "https://api.meshapi.ai"
+      },
+      "custom_provider_config": {
+        "base_provider_type": "openai",
+        "allowed_requests": {
+          "chat_completion": true,
+          "chat_completion_stream": true
+        }
+      }
     }
   }
 }

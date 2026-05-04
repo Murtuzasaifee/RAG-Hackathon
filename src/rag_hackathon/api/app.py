@@ -33,8 +33,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         base_url=settings.bifrost_url,
         api_key=settings.openai_api_key,
         chat_provider=settings.llm_provider,
-        chat_api_key=settings.mesh_api_key,
-        chat_base_url="https://api.meshapi.ai",
     )
     qdrant = AsyncQdrantClient(url=settings.qdrant_url)
     redis_client = aioredis.from_url(settings.redis_url)
@@ -53,7 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         sparse_embedder=sparse_embedder,
         rrf_k=settings.rrf_k,
     )
-    reranker = CohereReranker(settings.cohere_api_key, settings.rerank_model)
+    reranker = CohereReranker(settings.bifrost_url, settings.rerank_model)
     generator = GroundedGenerator(bifrost, settings.llm_model)
     cache = RedisCache(redis_client)
     guard = LLMGuardClient(settings.llm_guard_url)
