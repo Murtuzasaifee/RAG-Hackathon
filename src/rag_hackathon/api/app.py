@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         sparse_embedder=sparse_embedder,
         rrf_k=settings.rrf_k,
     )
-    reranker = CohereReranker(settings.cohere_api_key, settings.rerank_model)
+    reranker = CohereReranker(settings.bifrost_url, settings.rerank_model)
     generator = GroundedGenerator(bifrost, settings.llm_model)
     cache = RedisCache(redis_client)
     guard = LLMGuardClient(settings.llm_guard_url)

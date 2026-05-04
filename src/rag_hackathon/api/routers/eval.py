@@ -44,7 +44,7 @@ async def _run_eval_background() -> EvalReport:
             sparse_embedder=sparse,
             rrf_k=settings.rrf_k,
         )
-        reranker = CohereReranker(bifrost, settings.rerank_model)
+        reranker = CohereReranker(settings.bifrost_url, settings.rerank_model)
         generator = GroundedGenerator(bifrost, settings.llm_model)
 
         query_service = QueryService(

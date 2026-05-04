@@ -13,6 +13,21 @@
         }
       ]
     },
+    "cohere": {
+      "keys": [
+        {
+          "name": "cohere-key",
+          "value": "env.COHERE_API_KEY",
+          "models": [
+            "rerank-english-v3.0",
+            "rerank-multilingual-v3.0",
+            "rerank-v3.5",
+            "rerank-v4.0-fast"
+          ],
+          "weight": 1.0
+        }
+      ]
+    },
     "meshapi": {
       "keys": [
         {
