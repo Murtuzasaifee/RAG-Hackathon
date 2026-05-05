@@ -69,6 +69,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.qdrant = qdrant
     app.state.bifrost = bifrost
 
+    await guard.warmup()
+
     yield
 
     await guard.close()
