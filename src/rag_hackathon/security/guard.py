@@ -55,6 +55,11 @@ def _parse_scanners(data: dict) -> tuple[bool, float, list[str]]:
                 "is_valid", True
             ):
                 max_score = max(max_score, float(result["score"]))
+    # LLM Guard can return is_valid=false at the top level without populating
+    # per-scanner detail (e.g. when scan_fail_fast triggers before scanners report).
+    # Surface a generic reason so callers always have a non-empty reason list.
+    if not is_valid and not reasons:
+        reasons = ["guard_flagged_no_scanner_detail"]
     return is_valid, max_score, reasons
 
 
@@ -112,6 +117,15 @@ class LLMGuardClient:
                 for name, res in (data.get("scanners") or {}).items()
                 if isinstance(res, dict)
             }
+
+            if not is_valid:
+                logger.warning(
+                    "guard.input.blocked",
+                    reasons=reasons,
+                    score=max_score,
+                    scanners=scanner_detail,
+                    raw_response=data,
+                )
 
             logger.info(
                 "guard.input.scan_complete",
@@ -204,6 +218,16 @@ class LLMGuardClient:
 
         is_valid, max_score, reasons = _parse_scanners(data)
         sanitized = data.get("sanitized_output", output)
+
+        if not is_valid:
+            logger.warning(
+                "guard.output.slice_blocked",
+                slice=slice_index + 1,
+                total_slices=total_slices,
+                reasons=reasons,
+                score=max_score,
+                raw_response=data,
+            )
 
         logger.info(
             "guard.output.slice_done",

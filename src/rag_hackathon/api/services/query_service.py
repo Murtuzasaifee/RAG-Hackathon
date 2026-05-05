@@ -122,10 +122,15 @@ class QueryService:
                     "query.guard_input_blocked",
                     request_id=request_id,
                     reasons=input_result.reasons,
+                    score=input_result.score,
+                    query_preview=request.query[:120],
                 )
-                raise GuardError(
-                    f"Input blocked: {', '.join(input_result.reasons)}"
+                reason_str = (
+                    ", ".join(input_result.reasons)
+                    if input_result.reasons
+                    else "guard flagged with no scanner detail"
                 )
+                raise GuardError(f"Input blocked by LLM Guard — {reason_str}")
         else:
             logger.debug("query.guard_input_skipped", request_id=request_id)
 
