@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from rag_hackathon.ingestion.embedders.openai_dense import OpenAIDenseEmbedder
+from app.ingestion.embedders.openai_dense import OpenAIDenseEmbedder
 
 
 async def test_embed_returns_vectors():

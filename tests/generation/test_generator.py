@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from rag_hackathon.core.errors import GenerationError
-from rag_hackathon.core.types import RetrievalHit
-from rag_hackathon.generation.generator import GroundedGenerator
+from app.core.errors import GenerationError
+from app.core.types import RetrievalHit
+from app.generation.generator import GroundedGenerator
 
 
 def _make_hit(chunk_text: str = "some text", score: float = 0.9) -> RetrievalHit:

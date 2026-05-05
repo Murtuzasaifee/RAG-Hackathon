@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from rag_hackathon.core.errors import GuardError
-from rag_hackathon.security.guard import LLMGuardClient, _chunk_text_for_nli
+from app.core.errors import GuardError
+from app.security.guard import LLMGuardClient, _chunk_text_for_nli
 
 
 @pytest.fixture

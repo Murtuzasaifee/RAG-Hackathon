@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from rag_hackathon.cache.redis_cache import RedisCache, cache_key
+from app.cache.redis_cache import RedisCache, cache_key
 
 
 @pytest.fixture

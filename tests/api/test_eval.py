@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from rag_hackathon.api.app import create_app
+from app.api.app import create_app
 
 
 def test_eval_run_returns_report():
@@ -42,7 +42,7 @@ def test_eval_run_returns_report():
     ]
 
     with patch(
-        "rag_hackathon.api.routers.eval._run_eval_background",
+        "app.api.routers.eval._run_eval_background",
         return_value=mock_report,
     ):
         resp = client.post("/eval/run")
@@ -74,7 +74,7 @@ def test_eval_run_with_failures():
     ]
 
     with patch(
-        "rag_hackathon.api.routers.eval._run_eval_background",
+        "app.api.routers.eval._run_eval_background",
         return_value=mock_report,
     ):
         resp = client.post("/eval/run")

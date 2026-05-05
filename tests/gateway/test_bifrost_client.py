@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from rag_hackathon.core.errors import GatewayError
-from rag_hackathon.gateway.bifrost import BifrostClient
+from app.core.errors import GatewayError
+from app.gateway.bifrost import BifrostClient
 
 
 @pytest.fixture

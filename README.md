@@ -1,6 +1,8 @@
-# RAG Hackathon Backend
+# LineageRAG
 
-Production-grade Retrieval-Augmented Generation backend built with Python 3.13 and FastAPI.
+**Trace every answer back to the source.**
+
+LineageRAG is a production-grade Retrieval-Augmented Generation backend built with Python 3.13 and FastAPI. It combines hybrid retrieval, grounded generation, document versioning, safety checks, caching, observability, and citation-level source lineage with PDF bounding-box highlighting.
 
 **One command to run the full stack:** `docker compose up`
 
@@ -150,7 +152,7 @@ To iterate faster without building the Docker image every time, start only sidec
 
 ```bash
 docker compose up qdrant redis bifrost llm-guard -d
-uv run uvicorn rag_hackathon.api.app:app --reload
+uv run uvicorn app.api.app:app --reload
 ```
 > **Note:** The app reads `.env` for sidecar URLs. When running locally, swap your `_URL` variables to their `localhost` variants (provided as comments in `.env.example`).
 
@@ -410,7 +412,7 @@ This skips sparse embedding and output scanning entirely. Dense-only retrieval w
 ## Project Structure
 
 ```
-src/rag_hackathon/
+src/app/
 ├── api/                    # FastAPI routes, schemas, middleware
 │   ├── routers/            # ingest, query, documents, health, demo
 │   ├── services/           # QueryService orchestration

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from rag_hackathon.api.app import app
+from app.api.app import app
 
 
 @pytest.fixture
@@ -28,8 +28,8 @@ async def test_request_id_echoed_when_provided(client: AsyncClient):
 async def test_error_handler_maps_ingestion_error(client: AsyncClient):
     from fastapi import FastAPI
 
-    from rag_hackathon.api.error_handlers import RAGError, rag_error_handler
-    from rag_hackathon.core.errors import IngestionError
+    from app.api.error_handlers import RAGError, rag_error_handler
+    from app.core.errors import IngestionError
 
     test_app = FastAPI()
     test_app.add_exception_handler(RAGError, rag_error_handler)

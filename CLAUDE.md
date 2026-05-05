@@ -26,12 +26,12 @@ Sidecars (all in `docker-compose.yml`): Bifrost, LLM Guard, Qdrant, Redis.
 - **Package manager:** `uv` (always). Add deps with `uv add <pkg>`. Sync with `uv sync`.
 - **Python:** 3.13.
 - **Test runner:** `uv run pytest`.
-- **Run server (local):** `uv run uvicorn rag_hackathon.api.app:app --reload`.
+- **Run server (local):** `uv run uvicorn app.api.app:app --reload`.
 - **Run stack:** `docker compose up`.
 
 ## Code Conventions
 
-- **Layout:** `src/rag_hackathon/` package with submodules `api/`, `ingestion/`, `retrieval/`, `generation/`, `security/`, `gateway/`, `cache/`, `versioning/`, `eval/`, `observability/`, `core/`. `tests/` mirrors `src/` structure. Routers: `health`, `ingest`, `query`, `documents`, `eval`.
+- **Layout:** `src/app/` package with submodules `api/`, `ingestion/`, `retrieval/`, `generation/`, `security/`, `gateway/`, `cache/`, `versioning/`, `eval/`, `observability/`, `core/`. `tests/` mirrors `src/` structure. Routers: `health`, `ingest`, `query`, `documents`, `eval`.
 - **Strategy boundaries:** every swappable component (chunker, embedder, retriever, reranker, generator, guard, gateway client) defines its `Protocol` in `protocols.py` inside its submodule. Default impl lives next to it. The query route pulls `QueryService` from `app.state`; ingest/documents/eval routers construct dependencies inline for simplicity.
 - **Pydantic v2 at every API boundary.** Request/response models live in `api/schemas.py`. Inter-module value objects live in `core/types.py` (`ParsedDocument`, `Chunk`, `Citation`, `RetrievalHit`, `Answer`, `JobStatus`).
 - **Settings:** single `Settings` class via `pydantic-settings`, accessed through `lru_cache`-wrapped `get_settings()`. Env-var driven. Secrets only in env, never in code or logs.
@@ -89,7 +89,7 @@ These are explicit non-goals from the requirements doc — do not add them specu
 
 ## Required Environment Variables
 
-Listed in full in U1 of the plan. Required (no defaults, app fails to start without them): `AZURE_DI_ENDPOINT`, `AZURE_DI_KEY`, `OPENAI_API_KEY`, `COHERE_API_KEY`, `LOGFIRE_TOKEN`. `OPENAI_BASE_URL` is optional — when set in `.env`, Bifrost routes OpenAI-compatible traffic through that provider (e.g. `https://api.meshapi.ai`). Sidecar URLs and tunables have sensible defaults — see `Settings` in `src/rag_hackathon/core/settings.py` and `.env.example`.
+Listed in full in U1 of the plan. Required (no defaults, app fails to start without them): `AZURE_DI_ENDPOINT`, `AZURE_DI_KEY`, `OPENAI_API_KEY`, `COHERE_API_KEY`, `LOGFIRE_TOKEN`. `OPENAI_BASE_URL` is optional — when set in `.env`, Bifrost routes OpenAI-compatible traffic through that provider (e.g. `https://api.meshapi.ai`). Sidecar URLs and tunables have sensible defaults — see `Settings` in `src/app/core/settings.py` and `.env.example`.
 
 ## Project Tracker
 

@@ -6,7 +6,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _isolate_settings():
-    from rag_hackathon.core.settings import get_settings
+    from app.core.settings import get_settings
 
     get_settings.cache_clear()
     yield

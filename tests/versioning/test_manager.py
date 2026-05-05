@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from qdrant_client import models
 
-from rag_hackathon.versioning.manager import VersionManager
+from app.versioning.manager import VersionManager
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 from pydantic_settings import SettingsConfigDict
 
-from rag_hackathon.core.settings import Settings
+from app.core.settings import Settings
 
 REQUIRED_ENV = {
     "AZURE_DI_ENDPOINT": "https://example.cognitiveservices.azure.com",

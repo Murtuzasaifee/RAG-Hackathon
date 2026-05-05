@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
-from rag_hackathon.core.types import JobStatus
-from rag_hackathon.ingestion.jobs import RedisJobStore, make_job_id, make_version_id
+from app.core.types import JobStatus
+from app.ingestion.jobs import RedisJobStore, make_job_id, make_version_id
 
 
 async def test_make_job_id_unique():

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from rag_hackathon.observability.logging import (
+from app.observability.logging import (
     configure_logging,
     get_logger,
     request_id_var,

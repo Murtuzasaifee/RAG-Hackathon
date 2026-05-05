@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from rag_hackathon.core.errors import IngestionError
-from rag_hackathon.ingestion.parser import AzureDIParser
+from app.core.errors import IngestionError
+from app.ingestion.parser import AzureDIParser
 
 
 def _make_mock_result():
@@ -82,7 +82,7 @@ async def test_parse_returns_parsed_document(parser: AzureDIParser):
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "rag_hackathon.ingestion.parser.DocumentIntelligenceClient",
+        "app.ingestion.parser.DocumentIntelligenceClient",
         return_value=mock_client,
     ):
         doc = await parser.parse(b"fake-bytes", "doc-1")
@@ -113,7 +113,7 @@ async def test_parse_empty_document(parser: AzureDIParser):
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "rag_hackathon.ingestion.parser.DocumentIntelligenceClient",
+        "app.ingestion.parser.DocumentIntelligenceClient",
         return_value=mock_client,
     ):
         doc = await parser.parse(b"empty", "doc-empty")
@@ -132,7 +132,7 @@ async def test_parse_bad_bytes_raises_ingestion_error(parser: AzureDIParser):
 
     with (
         patch(
-            "rag_hackathon.ingestion.parser.DocumentIntelligenceClient",
+            "app.ingestion.parser.DocumentIntelligenceClient",
             return_value=mock_client,
         ),
         pytest.raises(IngestionError, match="Document parsing failed"),
@@ -160,7 +160,7 @@ async def test_section_path_deep_hierarchy(parser: AzureDIParser):
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "rag_hackathon.ingestion.parser.DocumentIntelligenceClient",
+        "app.ingestion.parser.DocumentIntelligenceClient",
         return_value=mock_client,
     ):
         doc = await parser.parse(b"bytes", "doc-hier")

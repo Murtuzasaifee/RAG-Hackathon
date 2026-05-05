@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from rag_hackathon.core.types import RetrievalHit
-from rag_hackathon.gateway.protocols import RerankHit
-from rag_hackathon.retrieval.hybrid_qdrant import HybridQdrantRetriever
-from rag_hackathon.retrieval.reranker_cohere import CohereReranker
+from app.core.types import RetrievalHit
+from app.gateway.protocols import RerankHit
+from app.retrieval.hybrid_qdrant import HybridQdrantRetriever
+from app.retrieval.reranker_cohere import CohereReranker
 
 
 def _make_hit(
@@ -39,7 +39,7 @@ class TestHybridQdrantRetriever:
 
     @pytest.fixture
     def sparse_embedder(self) -> AsyncMock:
-        from rag_hackathon.ingestion.embedders.protocols import SparseVector
+        from app.ingestion.embedders.protocols import SparseVector
 
         emb = AsyncMock()
         emb.embed.return_value = [
@@ -145,7 +145,7 @@ class TestHybridQdrantRetriever:
     ):
         qdrant_client = AsyncMock()
         qdrant_client.query_points.side_effect = Exception("connection refused")
-        from rag_hackathon.core.errors import RetrievalError
+        from app.core.errors import RetrievalError
 
         retriever = HybridQdrantRetriever(
             client=qdrant_client,

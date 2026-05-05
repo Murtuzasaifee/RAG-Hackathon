@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from rag_hackathon.core.types import (
+from app.core.types import (
     Chunk,
     Citation,
     JobStatus,
