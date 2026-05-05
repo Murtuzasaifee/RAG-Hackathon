@@ -6,10 +6,32 @@ app:
   lazy_load: true
 
 input_scanners:
-  - type: PromptInjection
+  # --- Rule-based (zero / near-zero cost) — run first ---
+  - type: InvisibleText            # Strips hidden Unicode / steganography payloads
   - type: TokenLimit
     params:
       limit: 4096
+  - type: Secrets                  # Detects accidentally pasted API keys / tokens
+    params:
+      redact_mode: REDACT_PARTIAL
+
+  # --- ML-based — run after cheap filters ---
+  - type: PromptInjection          # Explicit threshold makes behaviour reviewable
+    params:
+      threshold: 0.5
+  - type: Toxicity                 # Blocks harmful / offensive queries
+    params:
+      threshold: 0.6
+      match_type: full
+  - type: Gibberish                # Catches random keysmashing that wastes pipeline calls
+    params:
+      threshold: 0.7
+      match_type: full
+  - type: Language                 # Enforces English-only; also blocks non-EN jailbreaks
+    params:
+      languages:
+        - en
+      threshold: 0.6
 
 output_scanners:
   - type: FactualConsistency
