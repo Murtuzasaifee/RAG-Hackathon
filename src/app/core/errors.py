@@ -22,3 +22,11 @@ class GuardError(RAGError):
 
 class GatewayError(RAGError):
     pass
+
+
+class AuthError(RAGError):
+    pass
+
+
+class ForbiddenError(RAGError):
+    pass

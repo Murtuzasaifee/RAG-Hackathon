@@ -38,6 +38,8 @@ class Settings(BaseSettings):
 
     chunker_strategy: str = "document_aware"
     sparse_enabled: bool = True
+    auth_enabled: bool = True
+    admin_api_key: str | None = None
     llm_guard_input_enabled: bool = True
     llm_guard_output_enabled: bool = True
 
