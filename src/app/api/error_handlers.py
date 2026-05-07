@@ -4,6 +4,8 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from app.core.errors import (
+    AuthError,
+    ForbiddenError,
     GatewayError,
     GenerationError,
     GuardError,
@@ -18,6 +20,8 @@ def _error_body(error: str, message: str) -> dict:
 
 
 _ERROR_MAP: dict[type[RAGError], tuple[int, str]] = {
+    AuthError: (401, "auth_error"),
+    ForbiddenError: (403, "forbidden_error"),
     IngestionError: (422, "ingestion_error"),
     RetrievalError: (502, "retrieval_error"),
     GenerationError: (502, "generation_error"),
