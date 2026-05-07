@@ -38,6 +38,7 @@ class Settings(BaseSettings):
 
     chunker_strategy: str = "document_aware"
     sparse_enabled: bool = True
+    llm_guard_input_enabled: bool = True
     llm_guard_output_enabled: bool = True
 
     chunk_max_tokens: int = 512

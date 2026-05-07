@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         retriever=retriever,
         reranker=reranker,
         generator=generator,
-        input_guard=guard,
+        input_guard=guard if settings.llm_guard_input_enabled else None,
         output_guard=guard if settings.llm_guard_output_enabled else None,
         cache=cache,
         cache_ttl_answer=settings.cache_ttl_answer,
@@ -70,13 +70,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.qdrant = qdrant
     app.state.bifrost = bifrost
 
-    logger.info(
-        "llm_guard.warmup.starting",
-        llm_guard_url=settings.llm_guard_url,
-        message="Waiting for LLM Guard to load ML scanner models — startup will resume once warmup completes",
-    )
-    await guard.warmup()
-    logger.info("llm_guard.warmup.complete", message="LLM Guard warmup finished; all scanners ready")
+    # Warm up LLM Guard if either guard is enabled
+    if settings.llm_guard_input_enabled or settings.llm_guard_output_enabled:
+        logger.info(
+            "llm_guard.warmup.starting",
+            llm_guard_url=settings.llm_guard_url,
+            message="Waiting for LLM Guard to load ML scanner models — startup will resume once warmup completes",
+        )
+        await guard.warmup()
+        logger.info("llm_guard.warmup.complete", message="LLM Guard warmup finished; all scanners ready")
+    else:
+        logger.info("llm_guard.warmup.skipped", message="Skipping LLM Guard warmup because both input and output guards are disabled")
 
     yield
 
