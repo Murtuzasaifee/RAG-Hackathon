@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks
+from typing import Annotated
+
+from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.api.schemas import EvalRunResponse
+from app.security.auth import Principal, require_role
 from app.eval.ragas_runner import EvalReport, run_eval
 
 router = APIRouter(prefix="/eval", tags=["eval"])
@@ -60,7 +63,10 @@ async def _run_eval_background() -> EvalReport:
 
 
 @router.post("/run", response_model=EvalRunResponse)
-async def trigger_eval(background_tasks: BackgroundTasks):
+async def trigger_eval(
+    background_tasks: BackgroundTasks,
+    principal: Annotated[Principal, Depends(require_role("admin"))],
+):
     global _last_report  # noqa: PLW0603
 
     report = await _run_eval_background()

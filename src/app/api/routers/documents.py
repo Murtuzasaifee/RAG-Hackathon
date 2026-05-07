@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from typing import Annotated
+
 import redis.asyncio as aioredis
 import structlog
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from qdrant_client import AsyncQdrantClient
 
 from app.api.schemas import IngestResponse
 from app.cache.redis_cache import RedisCache
+from app.core.errors import ForbiddenError
 from app.core.settings import get_settings
+from app.security.auth import ROLE_ORDER, Principal, require_role
 from app.core.types import JobStage, JobState, JobStatus
 from app.ingestion.chunkers import get_chunker
 from app.ingestion.embedders.protocols import SparseVector
@@ -129,6 +133,7 @@ async def _run_reingest_pipeline(
 async def update_document(
     doc_id: str,
     background_tasks: BackgroundTasks,
+    principal: Annotated[Principal, Depends(require_role("editor"))],
     file: UploadFile = File(...),  # noqa: B008
 ):
     settings = get_settings()
@@ -172,6 +177,7 @@ async def update_document(
 @router.delete("/{doc_id}")
 async def delete_document(
     doc_id: str,
+    principal: Annotated[Principal, Depends(require_role("editor"))],
     mode: str = "soft",
     version_id: str | None = None,
 ):
@@ -180,6 +186,9 @@ async def delete_document(
             status_code=400,
             detail="mode must be 'soft' or 'hard'",
         )
+
+    if mode == "hard" and ROLE_ORDER.get(principal.role, -1) < ROLE_ORDER["admin"]:
+        raise ForbiddenError("hard delete requires admin role")
 
     settings = get_settings()
 

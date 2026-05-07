@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import Annotated
+
 import structlog
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.api.schemas import QueryRequest, QueryResponse
 from app.api.services.query_service import QueryService
 from app.observability.logging import request_id_var
+from app.security.auth import Principal, require_role
 
 router = APIRouter(prefix="/api/v1", tags=["query"])
 
@@ -13,7 +16,11 @@ logger = structlog.get_logger("app.api.query")
 
 
 @router.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest, fastapi_req: Request) -> QueryResponse:
+async def query(
+    request: QueryRequest,
+    fastapi_req: Request,
+    principal: Annotated[Principal, Depends(require_role("reader"))],
+) -> QueryResponse:
     request_id = request_id_var.get() or ""
     svc: QueryService = fastapi_req.app.state.query_service
     return await svc.run(request, request_id=request_id)

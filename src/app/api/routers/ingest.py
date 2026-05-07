@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import pathlib
+from typing import Annotated
+
 import structlog
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 
 from app.api.schemas import IngestResponse, JobStatusResponse
+from app.security.auth import Principal, require_role
 from app.core.settings import get_settings
 from app.core.types import JobStage, JobState, JobStatus
 from app.ingestion.chunkers import get_chunker
@@ -167,6 +170,7 @@ async def _run_ingest_pipeline(
 @router.post("/ingest", response_model=IngestResponse)  # noqa: B008
 async def ingest(
     background_tasks: BackgroundTasks,
+    principal: Annotated[Principal, Depends(require_role("editor"))],
     file: UploadFile = File(...),  # noqa: B008
     doc_id: str | None = Form(None),  # noqa: B008
 ):
@@ -213,7 +217,10 @@ async def ingest(
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
-async def get_job_status(job_id: str):
+async def get_job_status(
+    job_id: str,
+    principal: Annotated[Principal, Depends(require_role("reader"))],
+):
     settings = get_settings()
     import redis.asyncio as aioredis
 
