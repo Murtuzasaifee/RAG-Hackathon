@@ -21,6 +21,7 @@ from app.observability.logging import configure_logging, get_logger
 from app.observability.tracing import configure_tracing
 from app.retrieval.hybrid_qdrant import HybridQdrantRetriever
 from app.retrieval.reranker_cohere import CohereReranker
+from app.security.auth import seed_api_key
 from app.security.guard import LLMGuardClient
 
 logger = get_logger(__name__)
@@ -69,6 +70,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.redis = redis_client
     app.state.qdrant = qdrant
     app.state.bifrost = bifrost
+
+    if not settings.auth_enabled:
+        logger.warning(
+            "auth.disabled",
+            message="AUTH_ENABLED=false — all requests treated as admin. Never use in production.",
+        )
+    if settings.admin_api_key:
+        await seed_api_key(redis_client, settings.admin_api_key, "admin", "admin-bootstrap")
+        logger.info("auth.bootstrap.complete", message="Admin API key seeded from ADMIN_API_KEY")
+    else:
+        logger.info("auth.bootstrap.skipped", message="ADMIN_API_KEY not set; skipping bootstrap")
 
     # Warm up LLM Guard if either guard is enabled
     if settings.llm_guard_input_enabled or settings.llm_guard_output_enabled:
