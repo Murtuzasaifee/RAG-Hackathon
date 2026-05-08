@@ -8,6 +8,7 @@ import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 
 from app.api.schemas import IngestResponse, JobStatusResponse
+from app.cache.redis_cache import RedisCache
 from app.security.auth import Principal, require_role
 from app.core.settings import get_settings
 from app.core.types import JobStage, JobState, JobStatus
@@ -21,6 +22,7 @@ from app.ingestion.jobs import (
     now_utc,
 )
 from app.ingestion.parser import AzureDIParser
+from app.versioning.manager import VersionManager
 
 logger = structlog.get_logger("app.api.ingest")
 
@@ -157,6 +159,17 @@ async def _run_ingest_pipeline(
                 )
             finally:
                 await qdrant.close()
+
+            import redis.asyncio as aioredis
+
+            redis_client = aioredis.from_url(settings.redis_url)
+            cache = RedisCache(redis_client)
+            qdrant2 = AsyncQdrantClient(url=settings.qdrant_url)
+            try:
+                vm = VersionManager(qdrant2, settings.qdrant_collection, cache)
+                await vm.flip_active(doc_id, version_id)
+            finally:
+                await qdrant2.close()
 
             await _update("done", "done", 100)
             logger.info("ingest_complete", job_id=job_id, doc_id=doc_id, version_id=version_id, total_chunks=len(chunks))
