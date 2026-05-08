@@ -33,6 +33,7 @@ class HybridQdrantRetriever:
         doc_ids: list[str] | None = None,
         version_ids: list[str] | None = None,
         top_k: int = 20,
+        owner_id: str | None = None,
     ) -> list[RetrievalHit]:
         with stage_span("retrieve.hybrid", query_len=len(query), top_k=top_k):
             dense_vec = await self._dense.embed([query])
@@ -59,6 +60,13 @@ class HybridQdrantRetriever:
                     models.FieldCondition(
                         key="doc_id",
                         match=models.MatchAny(any=doc_ids),
+                    )
+                )
+            if owner_id is not None:
+                conditions.append(
+                    models.FieldCondition(
+                        key="owner_id",
+                        match=models.MatchValue(value=owner_id),
                     )
                 )
             query_filter = models.Filter(must=conditions) if conditions else None

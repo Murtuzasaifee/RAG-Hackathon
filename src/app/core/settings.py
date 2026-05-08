@@ -41,7 +41,8 @@ class Settings(BaseSettings):
     auth_enabled: bool = True
     admin_api_key: str | None = None
     demo_reader_key: str = "reader-test-key-abc123"
-    demo_editor_key: str = "editor-test-key-def456"
+    demo_editor1_key: str = "editor1-test-key-def456"
+    demo_editor2_key: str = "editor2-test-key-jkl012"
     demo_admin_key: str = "admin-test-key-ghi789"
     llm_guard_input_enabled: bool = True
     llm_guard_output_enabled: bool = True

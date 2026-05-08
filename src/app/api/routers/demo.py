@@ -26,8 +26,9 @@ async def demo_config() -> dict:
         "bifrost_url": settings.bifrost_public_url or settings.bifrost_url,
         "logfire_project_url": settings.logfire_project_url,
         "role_presets": [
-            {"label": "reader", "key": settings.demo_reader_key},
-            {"label": "editor", "key": settings.demo_editor_key},
-            {"label": "admin",  "key": settings.demo_admin_key},
+            {"label": "reader",  "key": settings.demo_reader_key},
+            {"label": "editor1",  "key": settings.demo_editor1_key},
+            {"label": "editor2", "key": settings.demo_editor2_key},
+            {"label": "admin",   "key": settings.demo_admin_key},
         ],
     }

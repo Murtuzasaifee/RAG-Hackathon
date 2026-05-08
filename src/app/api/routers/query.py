@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request
 from app.api.schemas import QueryRequest, QueryResponse
 from app.api.services.query_service import QueryService
 from app.observability.logging import request_id_var
-from app.security.auth import Principal, require_role
+from app.security.auth import ROLE_ORDER, Principal, require_role
 
 router = APIRouter(prefix="/api/v1", tags=["query"])
 
@@ -23,4 +23,6 @@ async def query(
 ) -> QueryResponse:
     request_id = request_id_var.get() or ""
     svc: QueryService = fastapi_req.app.state.query_service
-    return await svc.run(request, request_id=request_id)
+    # admin sees all documents; reader/editor scoped to their own ingested docs
+    owner_id = None if ROLE_ORDER.get(principal.role, 0) >= ROLE_ORDER["admin"] else principal.key_id
+    return await svc.run(request, request_id=request_id, owner_id=owner_id)

@@ -36,6 +36,7 @@ async def _run_reingest_pipeline(
     version_id: str,
     file_bytes: bytes,
     store: RedisJobStore,
+    owner_id: str | None = None,
 ) -> None:
     settings = get_settings()
 
@@ -107,6 +108,7 @@ async def _run_reingest_pipeline(
                     sparse_vectors,
                     doc_id,
                     version_id,
+                    owner_id=owner_id,
                 )
             finally:
                 await qdrant.close()
@@ -165,6 +167,7 @@ async def update_document(
         version_id,
         file_bytes,
         store,
+        principal.key_id,
     )
 
     return IngestResponse(

@@ -24,6 +24,7 @@ def _answer_cache_key(
     top_n: int,
     version_hash: str,
     epoch_map: dict[str, int],
+    owner_id: str | None = None,
 ) -> str:
     parts = [
         query,
@@ -33,6 +34,7 @@ def _answer_cache_key(
         str(top_n),
         version_hash,
         json.dumps(sorted(epoch_map.items())),
+        owner_id or "",
     ]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
@@ -89,6 +91,7 @@ class QueryService:
         self,
         request: QueryRequest,
         request_id: str = "",
+        owner_id: str | None = None,
     ) -> QueryResponse:
         timings: dict[str, int] = {}
         warnings: list[str] = []
@@ -153,6 +156,7 @@ class QueryService:
                 top_n=request.top_n,
                 version_hash=version_hash,
                 epoch_map=epoch_map,
+                owner_id=owner_id,
             )
             logger.debug("query.cache_lookup", request_id=request_id, cache_key=cache_key[:16])
             cached = await self._cache.get_json("answer", cache_key)
@@ -187,6 +191,7 @@ class QueryService:
             doc_ids=request.doc_ids,
             version_ids=request.version_ids,
             top_k=request.top_k,
+            owner_id=owner_id,
         )
         timings["retrieve_ms"] = int((time.perf_counter() - t0) * 1000)
         logger.info(
@@ -196,6 +201,10 @@ class QueryService:
             duration_ms=timings["retrieve_ms"],
             top_scores=[round(h.score, 4) for h in hits[:5]],
         )
+
+        if not hits and owner_id is not None:
+            warnings.append("no_documents_found_for_your_account — ingest documents first or contact an admin")
+            logger.info("query.no_hits_acl", request_id=request_id, owner_id=owner_id)
 
         t0 = time.perf_counter()
         logger.info(
@@ -293,6 +302,7 @@ class QueryService:
                 top_n=request.top_n,
                 version_hash=version_hash,
                 epoch_map=epoch_map,
+                owner_id=owner_id,
             )
             await self._cache.set_json(
                 "answer",

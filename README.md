@@ -69,7 +69,7 @@ graph TB
 | Vector store | Qdrant | Named vectors + RRF fusion |
 | Reranking | Cohere `rerank-english-v3.0` via Bifrost | Cross-encoder re-scoring |
 | Generation | MeshAPI `gpt-5.4` via Bifrost custom provider | Grounded answer synthesis |
-| Security | LLM Guard sidecar | Input scanning (mandatory), output groundedness (optional) |
+| Security | API key RBAC + LLM Guard sidecar | Role-based access control, input scanning, output groundedness |
 | Gateway | Bifrost AI Gateway | Unified gateway for all provider traffic (OpenAI, MeshAPI, Cohere) |
 | Caching | Redis | 3-tier TTL cache |
 | Observability | Logfire + structlog | JSON logs + distributed traces |
@@ -376,6 +376,15 @@ The key is seeded into Redis idempotently on every startup.
 ```bash
 AUTH_ENABLED=false
 ```
+
+### Document-Level ACL
+
+Each ingested document is tagged with the `owner_id` of the API key that uploaded it (stored in Qdrant payload). At query time:
+
+- `reader` / `editor` — Qdrant filter `owner_id == principal.key_id` applied automatically. Users only see documents they ingested.
+- `admin` — no `owner_id` filter. Sees all documents across all owners.
+
+No extra parameters needed — ACL is enforced transparently based on the API key role.
 
 ### LLM Guard Content Scanning
 

@@ -26,11 +26,12 @@ import redis.asyncio as aioredis
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Keys read from env vars — same defaults as Settings.demo_*_key.
-# Override in .env: DEMO_READER_KEY, DEMO_EDITOR_KEY, DEMO_ADMIN_KEY
+# Override in .env: DEMO_READER_KEY, DEMO_EDITOR_KEY, DEMO_EDITOR2_KEY, DEMO_ADMIN_KEY
 SEED_KEYS = [
-    (os.getenv("DEMO_READER_KEY", "reader-test-key-abc123"), "reader", "test-reader"),
-    (os.getenv("DEMO_EDITOR_KEY", "editor-test-key-def456"), "editor", "test-editor"),
-    (os.getenv("DEMO_ADMIN_KEY",  "admin-test-key-ghi789"),  "admin",  "test-admin"),
+    (os.getenv("DEMO_READER_KEY",  "reader-test-key-abc123"),  "reader", "test-reader"),
+    (os.getenv("DEMO_EDITOR1_KEY",  "editor1-test-key-def456"),  "editor", "test-editor1"),
+    (os.getenv("DEMO_EDITOR2_KEY", "editor2-test-key-jkl012"), "editor", "test-editor2"),
+    (os.getenv("DEMO_ADMIN_KEY",   "admin-test-key-ghi789"),   "admin",  "test-admin"),
 ]
 
 

@@ -45,6 +45,7 @@ async def _run_ingest_pipeline(
     version_id: str,
     file_bytes: bytes,
     store: RedisJobStore,
+    owner_id: str | None = None,
 ) -> None:
     settings = get_settings()
 
@@ -144,7 +145,7 @@ async def _run_ingest_pipeline(
                 indexer = QdrantIndexer(qdrant, settings.qdrant_collection)
                 await indexer.ensure_collection()
                 await indexer.upsert(
-                    chunks, dense_vectors, sparse_vectors, doc_id, version_id
+                    chunks, dense_vectors, sparse_vectors, doc_id, version_id, owner_id=owner_id
                 )
                 logger.info(
                     "indexing_done",
@@ -207,6 +208,7 @@ async def ingest(
         version_id,
         file_bytes,
         store,
+        principal.key_id,
     )
 
     return IngestResponse(

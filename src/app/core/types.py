@@ -40,6 +40,7 @@ class Chunk(BaseModel):
     bbox: list[float] = Field(default_factory=list)
     page_bboxes: list[dict[str, Any]] = Field(default_factory=list)
     chunk_type: ChunkType = "text"
+    owner_id: str | None = None
 
 
 class Citation(BaseModel):

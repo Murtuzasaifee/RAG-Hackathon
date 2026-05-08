@@ -41,6 +41,7 @@ class QdrantIndexer:
         vectors_sparse: list[SparseVector] | None,
         doc_id: str,
         version_id: str,
+        owner_id: str | None = None,
     ) -> None:
         if not chunks:
             return
@@ -76,6 +77,7 @@ class QdrantIndexer:
                             "chunk_text": chunk.text,
                             "chunk_type": chunk.chunk_type,
                             "chunk_index": chunk.chunk_index,
+                            "owner_id": owner_id or chunk.owner_id,
                         },
                     )
                 )
