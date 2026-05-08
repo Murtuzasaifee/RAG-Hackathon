@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from rag_hackathon.ingestion.embedders.protocols import SparseVector
-from rag_hackathon.ingestion.embedders.splade_sparse import SpladeSparseEmbedder
+from app.ingestion.embedders.protocols import SparseVector
+from app.ingestion.embedders.splade_sparse import SpladeSparseEmbedder
 
 
 async def test_embed_returns_sparse_vectors():

@@ -1,6 +1,8 @@
-# RAG Hackathon Backend
+# LineageRAG
 
-Production-grade Retrieval-Augmented Generation backend built with Python 3.13 and FastAPI.
+**Trace every answer back to the source.**
+
+LineageRAG is a production-grade Retrieval-Augmented Generation backend built with Python 3.13 and FastAPI. It combines hybrid retrieval, grounded generation, document versioning, safety checks, caching, observability, and citation-level source lineage with PDF bounding-box highlighting.
 
 **One command to run the full stack:** `docker compose up`
 
@@ -67,7 +69,7 @@ graph TB
 | Vector store | Qdrant | Named vectors + RRF fusion |
 | Reranking | Cohere `rerank-english-v3.0` via Bifrost | Cross-encoder re-scoring |
 | Generation | MeshAPI `gpt-5.4` via Bifrost custom provider | Grounded answer synthesis |
-| Security | LLM Guard sidecar | Input scanning (mandatory), output groundedness (optional) |
+| Security | API key RBAC + LLM Guard sidecar | Role-based access control, input scanning, output groundedness |
 | Gateway | Bifrost AI Gateway | Unified gateway for all provider traffic (OpenAI, MeshAPI, Cohere) |
 | Caching | Redis | 3-tier TTL cache |
 | Observability | Logfire + structlog | JSON logs + distributed traces |
@@ -150,7 +152,7 @@ To iterate faster without building the Docker image every time, start only sidec
 
 ```bash
 docker compose up qdrant redis bifrost llm-guard -d
-uv run uvicorn rag_hackathon.api.app:app --reload
+uv run uvicorn app.api.app:app --reload
 ```
 > **Note:** The app reads `.env` for sidecar URLs. When running locally, swap your `_URL` variables to their `localhost` variants (provided as comments in `.env.example`).
 
@@ -194,6 +196,7 @@ Upload a PDF for async ingestion. Returns a `job_id` for polling.
 
 ```bash
 curl -X POST http://localhost:8000/ingest \
+  -H "X-API-Key: editor-test-key-def456" \
   -H "X-Request-Id: $(uuidgen)" \
   -F "file=@document.pdf" \
   -F "doc_id=my-doc-1"
@@ -213,7 +216,9 @@ Response:
 Poll ingestion job status.
 
 ```bash
-curl http://localhost:8000/jobs/01J... -H "X-Request-Id: $(uuidgen)"
+curl http://localhost:8000/jobs/01J... \
+  -H "X-API-Key: reader-test-key-abc123" \
+  -H "X-Request-Id: $(uuidgen)"
 ```
 
 Response:
@@ -237,6 +242,7 @@ Query the RAG pipeline with hybrid retrieval + reranking + grounded generation.
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/query \
+  -H "X-API-Key: reader-test-key-abc123" \
   -H "Content-Type: application/json" \
   -H "X-Request-Id: $(uuidgen)" \
   -d '{
@@ -294,6 +300,7 @@ Re-ingest a document with a new version. The new version becomes active automati
 
 ```bash
 curl -X PUT http://localhost:8000/documents/my-doc-1 \
+  -H "X-API-Key: editor-test-key-def456" \
   -H "X-Request-Id: $(uuidgen)" \
   -F "file=@document-v2.pdf"
 ```
@@ -303,14 +310,17 @@ curl -X PUT http://localhost:8000/documents/my-doc-1 \
 Delete document points from Qdrant.
 
 ```bash
-# Soft delete (marks inactive, still queryable via version_ids)
-curl -X DELETE "http://localhost:8000/documents/my-doc-1?mode=soft"
+# Soft delete — editor or admin
+curl -X DELETE "http://localhost:8000/documents/my-doc-1?mode=soft" \
+  -H "X-API-Key: editor-test-key-def456"
 
-# Hard delete (removes points + invalidates caches)
-curl -X DELETE "http://localhost:8000/documents/my-doc-1?mode=hard"
+# Hard delete — admin only
+curl -X DELETE "http://localhost:8000/documents/my-doc-1?mode=hard" \
+  -H "X-API-Key: admin-test-key-ghi789"
 
 # Delete specific version only
-curl -X DELETE "http://localhost:8000/documents/my-doc-1?mode=soft&version_id=01J..."
+curl -X DELETE "http://localhost:8000/documents/my-doc-1?mode=soft&version_id=01J..." \
+  -H "X-API-Key: editor-test-key-def456"
 ```
 
 ### `GET /health`
@@ -328,10 +338,60 @@ All Qdrant points carry `(doc_id, version_id, active)` payload. Default retrieva
 
 ## Security
 
+### API Key Authentication & RBAC
+
+All endpoints (except `GET /health`, `GET /demo`, `GET /demo/config`) require an `X-API-Key` header. Three roles are supported, hierarchical (admin ⊃ editor ⊃ reader):
+
+| Role | Permitted endpoints |
+|------|-------------------|
+| `reader` | `POST /api/v1/query`, `GET /jobs/{job_id}` |
+| `editor` | reader + `POST /ingest`, `PUT /documents/{doc_id}`, `DELETE /documents/{doc_id}?mode=soft` |
+| `admin` | editor + `DELETE /documents/{doc_id}?mode=hard`, `POST /eval/run` |
+
+Missing key → `401`. Valid key, insufficient role → `403`.
+
+**Seeding keys for local development:**
+
+```bash
+# Start Redis first (or docker compose up redis)
+uv run python scripts/seed_keys.py
+```
+
+This seeds three test keys (`reader-test-key-abc123`, `editor-test-key-def456`, `admin-test-key-ghi789`) into Redis. Edit `scripts/seed_keys.py` to change them.
+
+**Bootstrap an admin key on startup** — set `ADMIN_API_KEY` in `.env`:
+
+```bash
+# Generate a secure key
+python -c "import secrets; print(secrets.token_hex(32))"
+
+# Add to .env
+ADMIN_API_KEY=<generated-key>
+```
+
+The key is seeded into Redis idempotently on every startup.
+
+**Bypass auth for local development** (never in production):
+
+```bash
+AUTH_ENABLED=false
+```
+
+### Document-Level ACL
+
+Each ingested document is tagged with the `owner_id` of the API key that uploaded it (stored in Qdrant payload). At query time:
+
+- `reader` / `editor` — Qdrant filter `owner_id == principal.key_id` applied automatically. Users only see documents they ingested.
+- `admin` — no `owner_id` filter. Sees all documents across all owners.
+
+No extra parameters needed — ACL is enforced transparently based on the API key role.
+
+### LLM Guard Content Scanning
+
 Two-layer scanning via LLM Guard sidecar (CPU inference, lazy model load):
 
-- **Input scanning (mandatory):** Prompt injection detection, token limit enforcement
-- **Output scanning (optional, enabled via `LLM_GUARD_OUTPUT_ENABLED`):** Factual consistency check via NLI (FactualConsistency scanner)
+- **Input scanning** (toggle: `LLM_GUARD_INPUT_ENABLED`): Prompt injection detection, token limit enforcement
+- **Output scanning** (toggle: `LLM_GUARD_OUTPUT_ENABLED`): Factual consistency check via NLI (FactualConsistency scanner)
 
 Input block → `400` with error details. Output concern → `warnings` array in response (does not block). Both layers fail-open on timeout or sidecar unavailability.
 
@@ -365,7 +425,10 @@ All settings are env-var driven. See `.env.example` for the full list.
 | `REDIS_URL` | No | `redis://localhost:6379/0` | Redis URL |
 | `LLM_MODEL` | No | `gpt-5.4` | LLM model for generation |
 | `LLM_PROVIDER` | No | `meshapi` | LLM provider (`meshapi` or `openai`) |
+| `AUTH_ENABLED` | No | `true` | Enable/disable API key auth (set `false` for local dev only) |
+| `ADMIN_API_KEY` | No | — | Raw admin key seeded into Redis idempotently on startup |
 | `SPARSE_ENABLED` | No | `true` | Enable/disable sparse channel |
+| `LLM_GUARD_INPUT_ENABLED` | No | `true` | Enable/disable input prompt scanning |
 | `LLM_GUARD_OUTPUT_ENABLED` | No | `true` | Enable/disable output groundedness scanning |
 | `CHUNK_MAX_TOKENS` | No | `512` | Max tokens per chunk |
 | `CACHE_TTL_ANSWER` | No | `3600` | Answer cache TTL (seconds) |
@@ -410,7 +473,7 @@ This skips sparse embedding and output scanning entirely. Dense-only retrieval w
 ## Project Structure
 
 ```
-src/rag_hackathon/
+src/app/
 ├── api/                    # FastAPI routes, schemas, middleware
 │   ├── routers/            # ingest, query, documents, health, demo
 │   ├── services/           # QueryService orchestration

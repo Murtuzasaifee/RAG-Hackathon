@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from rag_hackathon.eval.ragas_runner import (
+from app.eval.ragas_runner import (
     EvalRecord,
     EvalReport,
     EvalResult,
@@ -15,7 +15,7 @@ from rag_hackathon.eval.ragas_runner import (
 
 GOLDEN_SET_PATH = (
     pathlib.Path(__file__).parent.parent.parent
-    / "src" / "rag_hackathon" / "eval" / "golden_set.json"
+    / "src" / "app" / "eval" / "golden_set.json"
 )
 
 
@@ -116,9 +116,9 @@ class TestRunEval:
         mock_metric_instance.init = MagicMock()
 
         with patch(
-            "rag_hackathon.eval.ragas_runner.load_golden_set"
+            "app.eval.ragas_runner.load_golden_set"
         ) as mock_load, patch(
-            "rag_hackathon.eval.ragas_runner.get_settings"
+            "app.eval.ragas_runner.get_settings"
         ) as mock_settings, patch(
             "ragas.llms.llm_factory", mock_llm_factory
         ), patch(
@@ -145,7 +145,7 @@ class TestRunEval:
                 openai_api_key="test-key",
             )
 
-            from rag_hackathon.eval.ragas_runner import run_eval
+            from app.eval.ragas_runner import run_eval
 
             report = await run_eval(mock_qs)
 
@@ -161,7 +161,7 @@ class TestRunEval:
         mock_qs.run.side_effect = RuntimeError("Bifrost down")
 
         with patch(
-            "rag_hackathon.eval.ragas_runner.load_golden_set"
+            "app.eval.ragas_runner.load_golden_set"
         ) as mock_load:
             mock_load.return_value = [
                 EvalRecord(
@@ -172,7 +172,7 @@ class TestRunEval:
                 )
             ]
 
-            from rag_hackathon.eval.ragas_runner import run_eval
+            from app.eval.ragas_runner import run_eval
 
             report = await run_eval(mock_qs)
 

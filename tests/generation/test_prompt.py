@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from rag_hackathon.generation.prompt import build_messages, hits_to_dicts
+from app.generation.prompt import build_messages, hits_to_dicts
 
 
 def test_build_messages_no_hits():
@@ -41,7 +41,7 @@ def test_build_messages_multiple_hits():
 
 
 def test_hits_to_dicts():
-    from rag_hackathon.core.types import RetrievalHit
+    from app.core.types import RetrievalHit
 
     hits = [
         RetrievalHit(

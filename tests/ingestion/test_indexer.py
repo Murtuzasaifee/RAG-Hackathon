@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from rag_hackathon.core.types import Chunk
-from rag_hackathon.ingestion.embedders.protocols import SparseVector
-from rag_hackathon.ingestion.indexer import QdrantIndexer
+from app.core.types import Chunk
+from app.ingestion.embedders.protocols import SparseVector
+from app.ingestion.indexer import QdrantIndexer
 
 
 @pytest.fixture

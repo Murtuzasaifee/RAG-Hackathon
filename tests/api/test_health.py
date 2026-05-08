@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from rag_hackathon.api.app import app
+from app.api.app import app
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from rag_hackathon.ingestion.parser import _PageGeometry, _normalize_bbox
+from app.ingestion.parser import _PageGeometry, _normalize_bbox
 
 
 def test_normalize_bbox_uses_page_geometry():

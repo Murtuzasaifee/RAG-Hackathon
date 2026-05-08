@@ -26,12 +26,12 @@ Sidecars (all in `docker-compose.yml`): Bifrost, LLM Guard, Qdrant, Redis.
 - **Package manager:** `uv` (always). Add deps with `uv add <pkg>`. Sync with `uv sync`.
 - **Python:** 3.13.
 - **Test runner:** `uv run pytest`.
-- **Run server (local):** `uv run uvicorn rag_hackathon.api.app:app --reload`.
+- **Run server (local):** `uv run uvicorn app.api.app:app --reload`.
 - **Run stack:** `docker compose up`.
 
 ## Code Conventions
 
-- **Layout:** `src/rag_hackathon/` package with submodules `api/`, `ingestion/`, `retrieval/`, `generation/`, `security/`, `gateway/`, `cache/`, `versioning/`, `eval/`, `observability/`, `core/`. `tests/` mirrors `src/` structure. Routers: `health`, `ingest`, `query`, `documents`, `eval`.
+- **Layout:** `src/app/` package with submodules `api/`, `ingestion/`, `retrieval/`, `generation/`, `security/`, `gateway/`, `cache/`, `versioning/`, `eval/`, `observability/`, `core/`. `tests/` mirrors `src/` structure. Routers: `health`, `ingest`, `query`, `documents`, `eval`.
 - **Strategy boundaries:** every swappable component (chunker, embedder, retriever, reranker, generator, guard, gateway client) defines its `Protocol` in `protocols.py` inside its submodule. Default impl lives next to it. The query route pulls `QueryService` from `app.state`; ingest/documents/eval routers construct dependencies inline for simplicity.
 - **Pydantic v2 at every API boundary.** Request/response models live in `api/schemas.py`. Inter-module value objects live in `core/types.py` (`ParsedDocument`, `Chunk`, `Citation`, `RetrievalHit`, `Answer`, `JobStatus`).
 - **Settings:** single `Settings` class via `pydantic-settings`, accessed through `lru_cache`-wrapped `get_settings()`. Env-var driven. Secrets only in env, never in code or logs.
@@ -44,7 +44,7 @@ Sidecars (all in `docker-compose.yml`): Bifrost, LLM Guard, Qdrant, Redis.
 
 - **Provider traffic routing:** Embeddings go through Bifrost AI Gateway to OpenAI (`openai/text-embedding-3-small`). Chat/LLM calls go directly to MeshAPI (`https://api.meshapi.ai`) with the `MESH_API_KEY`. Cohere rerank calls go directly to `https://api.cohere.com/v2/rerank` from `CohereReranker`. Bifrost config (`docker/bifrost/config.json`) defines only the OpenAI provider for embeddings.
 - **Qdrant point id is deterministic:** `str(uuid.uuid5(NAMESPACE_RAG, f"{doc_id}:{version_id}:{chunk_index}"))` where `NAMESPACE_RAG` is a fixed UUID constant in `core/types.py`. Re-upsert is idempotent.
-- **Single Qdrant collection (`documents`) with two named vectors:** `dense` (1536-dim cosine) and `sparse`. Each point carries the full lineage payload — `doc_id`, `version_id`, `active`, `page`, `section_path`, `bbox`, `chunk_text`, `chunk_type`, `chunk_index`.
+- **Single Qdrant collection (`documents`) with two named vectors:** `dense` (1536-dim cosine) and `sparse`. Each point carries the full lineage payload — `doc_id`, `version_id`, `active`, `page`, `section_path`, `bbox`, `chunk_text`, `chunk_type`, `chunk_index`, `owner_id`.
 - **Versioning is payload-based, not collection-per-version.** Default retrieval filters `active == True`. Explicit `version_ids` parameter bypasses the `active` filter so older versions remain queryable.
 - **SPLADE v3 is symmetric.** Single model `naver/splade-v3` used for both ingestion and query-side sparse embeddings. Controlled by `SPARSE_ENABLED` and `SPARSE_MODEL` settings.
 - **`SPARSE_ENABLED=False` is a runtime escape hatch** — sparse channel skipped at both ingest and retrieve, dense-only fallback. No code changes required for low-memory machines.
@@ -53,6 +53,8 @@ Sidecars (all in `docker-compose.yml`): Bifrost, LLM Guard, Qdrant, Redis.
 - **`Citation.score` semantics:** rerank score when reranking ran for this query, else the RRF fusion score. `RetrievalHit.score` carries the same semantic.
 - **Query orchestration lives in `api/services/query_service.py`.** Both the `POST /query` route handler and the eval runner call `QueryService.run(...)` directly. The route handler is thin; the eval runner avoids re-wiring FastAPI dependency injection.
 - **Cache key for the answer cache** is `sha256(query + filters + active_version_hash + doc_cache_epoch)`. The `active_version_hash` is read from a Redis-maintained index (`doc:active:{doc_id}` hash), not by scanning Qdrant. `doc_cache_epoch` (`doc:epoch:{doc_id}` integer) is bumped on every hard delete so cached answers referencing that `doc_id` become unreachable without a keyspace scan.
+- **API key auth** via `X-API-Key` header. Keys in Redis as `apikey:{sha256_hex}` hashes. Roles: `reader` / `editor` / `admin`. `ROLE_ORDER` in `src/app/security/auth.py`. `AUTH_ENABLED=false` bypasses for local dev. Bootstrap via `ADMIN_API_KEY` env var; test keys via `scripts/seed_keys.py`.
+- **Document-level ACL** — `owner_id` (= `principal.key_id`) written to Qdrant payload at ingest. Query route injects `owner_id` filter for reader/editor; admin sees all. Demo UI role dropdown driven by `/demo/config` response (keys from `DEMO_*_KEY` settings).
 - **`JobRunner` ships with `BackgroundTasksRunner` (FastAPI BackgroundTasks)** as the active implementation, with a Redis-backed `JobStore` for status. Migration to arq/celery is a deferred follow-up; the protocol exists to localize that swap.
 
 ## Working Style
@@ -89,7 +91,7 @@ These are explicit non-goals from the requirements doc — do not add them specu
 
 ## Required Environment Variables
 
-Listed in full in U1 of the plan. Required (no defaults, app fails to start without them): `AZURE_DI_ENDPOINT`, `AZURE_DI_KEY`, `OPENAI_API_KEY`, `COHERE_API_KEY`, `LOGFIRE_TOKEN`. `OPENAI_BASE_URL` is optional — when set in `.env`, Bifrost routes OpenAI-compatible traffic through that provider (e.g. `https://api.meshapi.ai`). Sidecar URLs and tunables have sensible defaults — see `Settings` in `src/rag_hackathon/core/settings.py` and `.env.example`.
+Listed in full in U1 of the plan. Required (no defaults, app fails to start without them): `AZURE_DI_ENDPOINT`, `AZURE_DI_KEY`, `OPENAI_API_KEY`, `COHERE_API_KEY`, `LOGFIRE_TOKEN`. `OPENAI_BASE_URL` is optional — when set in `.env`, Bifrost routes OpenAI-compatible traffic through that provider (e.g. `https://api.meshapi.ai`). Sidecar URLs and tunables have sensible defaults — see `Settings` in `src/app/core/settings.py` and `.env.example`.
 
 ## Project Tracker
 

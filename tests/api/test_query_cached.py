@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from rag_hackathon.api.schemas import QueryRequest
-from rag_hackathon.api.services.query_service import QueryService
-from rag_hackathon.cache.redis_cache import RedisCache
-from rag_hackathon.core.types import Answer, Citation, RetrievalHit
+from app.api.schemas import QueryRequest
+from app.api.services.query_service import QueryService
+from app.cache.redis_cache import RedisCache
+from app.core.types import Answer, Citation, RetrievalHit
 
 
 def _make_hit(text: str = "chunk text", score: float = 0.9) -> RetrievalHit:
@@ -174,7 +174,7 @@ async def test_query_cache_epoch_change_invalidates(
     assert resp1.answer == "The answer is 42."
     assert generator.generate.await_count == 1
 
-    from rag_hackathon.cache.redis_cache import cache_key
+    from app.cache.redis_cache import cache_key
 
     epoch_key = cache_key("doc_epoch", "d1")
     fake_redis._store[epoch_key] = b"1"

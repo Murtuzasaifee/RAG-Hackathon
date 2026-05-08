@@ -5,13 +5,13 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
-from rag_hackathon.api.app import create_app
-from rag_hackathon.api.services.query_service import QueryService
+from app.api.app import create_app
+from app.api.services.query_service import QueryService
 
 
 @pytest.fixture
 def mock_query_service() -> AsyncMock:
-    from rag_hackathon.api.schemas import CitationResponse, QueryResponse
+    from app.api.schemas import CitationResponse, QueryResponse
 
     svc = AsyncMock(spec=QueryService)
     svc.run.return_value = QueryResponse(

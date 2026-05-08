@@ -26,12 +26,12 @@ Sidecars (all in `docker-compose.yml`): Bifrost, LLM Guard, Qdrant, Redis.
 - **Package manager:** `uv` (always). Add deps with `uv add <pkg>`. Sync with `uv sync`.
 - **Python:** 3.13.
 - **Test runner:** `uv run pytest`.
-- **Run server (local):** `uv run uvicorn rag_hackathon.api.app:app --reload`.
+- **Run server (local):** `uv run uvicorn app.api.app:app --reload`.
 - **Run stack:** `docker compose up`.
 
 ## Code Conventions
 
-- **Layout:** `src/rag_hackathon/` package with submodules `api/`, `ingestion/`, `retrieval/`, `generation/`, `security/`, `gateway/`, `cache/`, `versioning/`, `eval/`, `observability/`, `core/`. `tests/` mirrors `src/` structure. Routers: `health`, `ingest`, `query`, `documents`, `eval`.
+- **Layout:** `src/app/` package with submodules `api/`, `ingestion/`, `retrieval/`, `generation/`, `security/`, `gateway/`, `cache/`, `versioning/`, `eval/`, `observability/`, `core/`. `tests/` mirrors `src/` structure. Routers: `health`, `ingest`, `query`, `documents`, `eval`.
 - **Strategy boundaries:** every swappable component (chunker, embedder, retriever, reranker, generator, guard, gateway client) defines its `Protocol` in `protocols.py` inside its submodule. Default impl lives next to it. The query route pulls `QueryService` from `app.state`; ingest/documents/eval routers construct dependencies inline for simplicity.
 - **Pydantic v2 at every API boundary.** Request/response models live in `api/schemas.py`. Inter-module value objects live in `core/types.py` (`ParsedDocument`, `Chunk`, `Citation`, `RetrievalHit`, `Answer`, `JobStatus`).
 - **Settings:** single `Settings` class via `pydantic-settings`, accessed through `lru_cache`-wrapped `get_settings()`. Env-var driven. Secrets only in env, never in code or logs.
@@ -44,7 +44,7 @@ Sidecars (all in `docker-compose.yml`): Bifrost, LLM Guard, Qdrant, Redis.
 
 - **Provider traffic routing:** Embeddings go through Bifrost AI Gateway to OpenAI (`openai/text-embedding-3-small`). Chat/LLM calls go directly to MeshAPI (`https://api.meshapi.ai`) with the `MESH_API_KEY`. Cohere rerank calls go directly to `https://api.cohere.com/v2/rerank` from `CohereReranker`. Bifrost config (`docker/bifrost/config.json`) defines only the OpenAI provider for embeddings.
 - **Qdrant point id is deterministic:** `str(uuid.uuid5(NAMESPACE_RAG, f"{doc_id}:{version_id}:{chunk_index}"))` where `NAMESPACE_RAG` is a fixed UUID constant in `core/types.py`. Re-upsert is idempotent.
-- **Single Qdrant collection (`documents`) with two named vectors:** `dense` (1536-dim cosine) and `sparse`. Each point carries the full lineage payload — `doc_id`, `version_id`, `active`, `page`, `section_path`, `bbox`, `chunk_text`, `chunk_type`, `chunk_index`.
+- **Single Qdrant collection (`documents`) with two named vectors:** `dense` (1536-dim cosine) and `sparse`. Each point carries the full lineage payload — `doc_id`, `version_id`, `active`, `page`, `section_path`, `bbox`, `chunk_text`, `chunk_type`, `chunk_index`, `owner_id`.
 - **Versioning is payload-based, not collection-per-version.** Default retrieval filters `active == True`. Explicit `version_ids` parameter bypasses the `active` filter so older versions remain queryable.
 - **SPLADE v3 is symmetric.** Single model `naver/splade-v3` used for both ingestion and query-side sparse embeddings. Controlled by `SPARSE_ENABLED` and `SPARSE_MODEL` settings.
 - **`SPARSE_ENABLED=False` is a runtime escape hatch** — sparse channel skipped at both ingest and retrieve, dense-only fallback. No code changes required for low-memory machines.
@@ -74,12 +74,20 @@ Sidecars (all in `docker-compose.yml`): Bifrost, LLM Guard, Qdrant, Redis.
 - Prefer `Edit` over `Write`. Reserve `Write` for new files or full rewrites the user explicitly asked for.
 - Use one `Write` over many sequential `Edit` calls when changes are widespread in a single file.
 
+## Auth & RBAC Invariants
+
+- **API key auth** via `X-API-Key` header. Keys stored in Redis as `apikey:{sha256_hex}` hashes. Never store raw key.
+- **Three roles** — `reader` (query only), `editor` (ingest + query), `admin` (all + hard delete + eval). Hierarchy enforced by `ROLE_ORDER` in `src/app/security/auth.py`.
+- **Document-level ACL** — `owner_id` written to Qdrant payload at ingest time (`principal.key_id`). Query route injects `owner_id` filter for reader/editor; admin gets no filter (sees all).
+- **`AUTH_ENABLED=false`** bypasses all checks — for local dev only. Emits WARNING on startup.
+- **Bootstrap** — `ADMIN_API_KEY` env var seeds an admin key into Redis idempotently on startup. Use `scripts/seed_keys.py` for reader/editor test keys.
+- **Demo UI** — role preset dropdown in sidebar auto-fills key from `/demo/config` response. Keys come from `DEMO_READER_KEY`, `DEMO_EDITOR_KEY`, `DEMO_ADMIN_KEY` settings.
+
 ## Out of Scope (Do Not Build)
 
 These are explicit non-goals from the requirements doc — do not add them speculatively:
 
 - Frontend / UI
-- AuthN / AuthZ / multi-tenant isolation
 - Prometheus / Grafana / OTel collector (Logfire is the chosen substitute)
 - Kubernetes manifests, CI/CD pipelines, load testing
 - Hosted / cloud Qdrant
@@ -89,7 +97,7 @@ These are explicit non-goals from the requirements doc — do not add them specu
 
 ## Required Environment Variables
 
-Listed in full in U1 of the plan. Required (no defaults, app fails to start without them): `AZURE_DI_ENDPOINT`, `AZURE_DI_KEY`, `OPENAI_API_KEY`, `MESH_API_KEY`, `COHERE_API_KEY`, `LOGFIRE_TOKEN`. Sidecar URLs and tunables have sensible defaults — see `Settings` in `src/rag_hackathon/core/settings.py` and `.env.example`.
+Listed in full in U1 of the plan. Required (no defaults, app fails to start without them): `AZURE_DI_ENDPOINT`, `AZURE_DI_KEY`, `OPENAI_API_KEY`, `MESH_API_KEY`, `COHERE_API_KEY`, `LOGFIRE_TOKEN`. Sidecar URLs and tunables have sensible defaults — see `Settings` in `src/app/core/settings.py` and `.env.example`.
 
 ## Project Tracker
 

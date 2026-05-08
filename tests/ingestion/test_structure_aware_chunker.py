@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from rag_hackathon.core.types import ParsedDocument, ParsedTable
-from rag_hackathon.ingestion.chunkers import get_chunker
-from rag_hackathon.ingestion.chunkers.document_aware import StructureAwareChunker
+from app.core.types import ParsedDocument, ParsedTable
+from app.ingestion.chunkers import get_chunker
+from app.ingestion.chunkers.document_aware import StructureAwareChunker
 
 _P1 = {
     "content": "Short paragraph one.",

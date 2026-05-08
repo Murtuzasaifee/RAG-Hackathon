@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
-from rag_hackathon.api.app import create_app
-from rag_hackathon.api.services.query_service import QueryService
-from rag_hackathon.core.types import Answer, Citation, RetrievalHit
-from rag_hackathon.security.protocols import ScanResult
+from app.api.app import create_app
+from app.api.services.query_service import QueryService
+from app.core.types import Answer, Citation, RetrievalHit
+from app.security.protocols import ScanResult
 
 
 def _make_hit(text: str = "some text", score: float = 0.9) -> RetrievalHit:

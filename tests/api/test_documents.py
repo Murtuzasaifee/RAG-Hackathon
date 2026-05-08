@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from rag_hackathon.api.app import create_app
+from app.api.app import create_app
 
 
 @pytest.fixture
@@ -31,13 +31,13 @@ class TestDeleteDocument:
         mock_redis = AsyncMock()
 
         with patch(
-            "rag_hackathon.api.routers.documents.AsyncQdrantClient",
+            "app.api.routers.documents.AsyncQdrantClient",
             return_value=mock_qdrant,
         ), patch(
-            "rag_hackathon.api.routers.documents.RedisCache",
+            "app.api.routers.documents.RedisCache",
             return_value=mock_cache,
         ), patch(
-            "rag_hackathon.api.routers.documents.aioredis.from_url",
+            "app.api.routers.documents.aioredis.from_url",
             return_value=mock_redis,
         ):
             resp = client.delete("/documents/doc1?mode=soft")
@@ -60,13 +60,13 @@ class TestDeleteDocument:
         mock_redis = AsyncMock()
 
         with patch(
-            "rag_hackathon.api.routers.documents.AsyncQdrantClient",
+            "app.api.routers.documents.AsyncQdrantClient",
             return_value=mock_qdrant,
         ), patch(
-            "rag_hackathon.api.routers.documents.RedisCache",
+            "app.api.routers.documents.RedisCache",
             return_value=mock_cache,
         ), patch(
-            "rag_hackathon.api.routers.documents.aioredis.from_url",
+            "app.api.routers.documents.aioredis.from_url",
             return_value=mock_redis,
         ):
             resp = client.delete("/documents/doc1?mode=hard")
@@ -86,13 +86,13 @@ class TestDeleteDocument:
         mock_redis = AsyncMock()
 
         with patch(
-            "rag_hackathon.api.routers.documents.AsyncQdrantClient",
+            "app.api.routers.documents.AsyncQdrantClient",
             return_value=mock_qdrant,
         ), patch(
-            "rag_hackathon.api.routers.documents.RedisCache",
+            "app.api.routers.documents.RedisCache",
             return_value=mock_cache,
         ), patch(
-            "rag_hackathon.api.routers.documents.aioredis.from_url",
+            "app.api.routers.documents.aioredis.from_url",
             return_value=mock_redis,
         ):
             resp = client.delete(
@@ -105,7 +105,7 @@ class TestDeleteDocument:
         mock_redis = AsyncMock()
 
         with patch(
-            "rag_hackathon.api.routers.documents.aioredis.from_url",
+            "app.api.routers.documents.aioredis.from_url",
             return_value=mock_redis,
         ):
             resp = client.delete("/documents/doc1?mode=invalid")
@@ -121,13 +121,13 @@ class TestDeleteDocument:
         mock_redis = AsyncMock()
 
         with patch(
-            "rag_hackathon.api.routers.documents.AsyncQdrantClient",
+            "app.api.routers.documents.AsyncQdrantClient",
             return_value=mock_qdrant,
         ), patch(
-            "rag_hackathon.api.routers.documents.RedisCache",
+            "app.api.routers.documents.RedisCache",
             return_value=mock_cache,
         ), patch(
-            "rag_hackathon.api.routers.documents.aioredis.from_url",
+            "app.api.routers.documents.aioredis.from_url",
             return_value=mock_redis,
         ):
             resp = client.delete("/documents/nonexistent?mode=soft")
@@ -143,10 +143,10 @@ class TestUpdateDocument:
         mock_store.get_status = AsyncMock(return_value=None)
 
         with patch(
-            "rag_hackathon.api.routers.documents.aioredis.from_url",
+            "app.api.routers.documents.aioredis.from_url",
             return_value=mock_redis,
         ), patch(
-            "rag_hackathon.api.routers.documents.RedisJobStore",
+            "app.api.routers.documents.RedisJobStore",
             return_value=mock_store,
         ):
             resp = client.put(

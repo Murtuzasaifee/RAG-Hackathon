@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from rag_hackathon.core.types import ParsedDocument, ParsedElement
-from rag_hackathon.ingestion.chunkers.chunker import DocumentAwareChunker
+from app.core.types import ParsedDocument, ParsedElement
+from app.ingestion.chunkers.chunker import DocumentAwareChunker
 
 
 def test_title_plus_single_body_chunk_preserves_body_bbox():
