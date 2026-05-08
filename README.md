@@ -439,17 +439,34 @@ All settings are env-var driven. See `.env.example` for the full list.
 | `CHUNK_MAX_TOKENS` | No | `512` | Max tokens per chunk |
 | `CACHE_TTL_ANSWER` | No | `3600` | Answer cache TTL (seconds) |
 
-## Running Tests
+## Development
+
+### Tests
 
 ```bash
-# Install dev dependencies
 uv sync
-
-# Run all tests
 uv run pytest tests/ -v
+```
 
-# Lint
+### Linting & Formatting (Ruff)
+
+Ruff replaces both flake8 (linting) and black (formatting). Config is in `pyproject.toml` under `[tool.ruff]` and `[tool.ruff.lint]`.
+
+```bash
+# Lint check (no changes)
 uv run ruff check src/ tests/
+
+# Auto-fix lint issues
+uv run ruff check --fix src/ tests/
+
+# Format check (no changes)
+uv run ruff format --check src/ tests/
+
+# Auto-format
+uv run ruff format src/ tests/
+
+# Full lint + format pass
+uv run ruff check --fix src/ tests/ && uv run ruff format src/ tests/
 ```
 
 ## Troubleshooting

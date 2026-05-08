@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import structlog
 from fastapi import Depends, Header, Request
@@ -12,6 +12,9 @@ from ulid import ULID
 
 from app.core.errors import AuthError, ForbiddenError
 from app.core.settings import get_settings
+
+if TYPE_CHECKING:
+    from qdrant_client import AsyncQdrantClient
 
 logger = structlog.get_logger("rag_hackathon.security.auth")
 
@@ -93,3 +96,42 @@ async def seed_api_key(redis, raw_key: str, role: str, label: str) -> str:
     )
     logger.info("auth.seed.stored", label=label, role=role, key_id=key_id)
     return key_id
+
+
+async def verify_document_ownership(
+    qdrant: AsyncQdrantClient,
+    collection: str,
+    doc_id: str,
+    principal: Principal,
+) -> None:
+    if ROLE_ORDER.get(principal.role, -1) >= ROLE_ORDER["admin"]:
+        return
+
+    from qdrant_client import models
+
+    points, _ = await qdrant.scroll(
+        collection_name=collection,
+        scroll_filter=models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="doc_id",
+                    match=models.MatchValue(value=doc_id),
+                ),
+            ]
+        ),
+        limit=1,
+        with_payload=["owner_id"],
+    )
+
+    if not points:
+        return
+
+    owner_id = (points[0].payload or {}).get("owner_id")
+    if owner_id is not None and owner_id != principal.key_id:
+        logger.warning(
+            "ownership.denied",
+            key_id=principal.key_id,
+            doc_id=doc_id,
+            owner_id=owner_id,
+        )
+        raise ForbiddenError("you do not own this document")
