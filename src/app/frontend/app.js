@@ -426,7 +426,7 @@ async function loadDocuments() {
     return;
   }
   try {
-    const docs = await requestJson("/api/v1/documents", { headers: getAuthHeaders() });
+    const docs = await requestJson("/documents", { headers: getAuthHeaders() });
     renderDocuments(docs);
   } catch (error) {
     el.docsList.innerHTML = `<span class="muted">${escapeHtml(error.message)}</span>`;
@@ -473,7 +473,7 @@ async function handleDocAction(action, docId) {
   const confirmed = confirm(`${mode === "hard" ? "Permanently" : "Soft"} delete "${docId}"?`);
   if (!confirmed) return;
   try {
-    await requestJson(`/api/v1/documents/${encodeURIComponent(docId)}?mode=${mode}`, {
+    await requestJson(`/documents/${encodeURIComponent(docId)}?mode=${mode}`, {
       method: "DELETE",
       headers: getAuthHeaders(),
     });
