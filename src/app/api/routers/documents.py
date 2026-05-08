@@ -5,9 +5,9 @@ from typing import Annotated
 import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
-from qdrant_client import AsyncQdrantClient
+from qdrant_client import AsyncQdrantClient, models
 
-from app.api.schemas import IngestResponse
+from app.api.schemas import DocumentInfo, IngestResponse
 from app.cache.redis_cache import RedisCache
 from app.core.errors import ForbiddenError
 from app.core.settings import get_settings
@@ -130,6 +130,49 @@ async def _run_reingest_pipeline(
     except Exception as exc:
         logger.error("reingest_failed", job_id=job_id, error=str(exc))
         await _update("failed", "failed", 0, error=str(exc))
+
+
+@router.get("", response_model=list[DocumentInfo])
+async def list_documents(
+    principal: Annotated[Principal, Depends(require_role("reader"))],
+):
+    settings = get_settings()
+    owner_id = None if ROLE_ORDER.get(principal.role, -1) >= ROLE_ORDER["admin"] else principal.key_id
+
+    conditions: list[models.Condition] = [
+        models.FieldCondition(key="active", match=models.MatchValue(value=True)),
+    ]
+    if owner_id is not None:
+        conditions.append(
+            models.FieldCondition(key="owner_id", match=models.MatchValue(value=owner_id))
+        )
+
+    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    try:
+        points, _ = await qdrant.scroll(
+            collection_name=settings.qdrant_collection,
+            scroll_filter=models.Filter(must=conditions),
+            limit=1000,
+            with_payload=["doc_id", "version_id", "owner_id"],
+        )
+    finally:
+        await qdrant.close()
+
+    docs: dict[str, dict] = {}
+    for point in points:
+        p = point.payload or {}
+        did = p.get("doc_id", "")
+        if did not in docs:
+            docs[did] = {
+                "doc_id": did,
+                "active_version_id": p.get("version_id"),
+                "total_chunks": 1,
+                "owner_id": p.get("owner_id"),
+            }
+        else:
+            docs[did]["total_chunks"] += 1
+
+    return [DocumentInfo(**d) for d in docs.values()]
 
 
 @router.put("/{doc_id}", response_model=IngestResponse)  # noqa: B008
