@@ -29,8 +29,10 @@ graph TB
     end
 
     subgraph Security
-        GuardIn["LLM Guard — Input Scan (mandatory)"]
-        GuardOut["LLM Guard — Output Scan (optional)"]
+        Auth["API Key Auth + RBAC (reader / editor / admin)"]
+        ACL["Document ACL (owner_id filter)"]
+        GuardIn["LLM Guard — Input Scan"]
+        GuardOut["LLM Guard — Output Scan"]
     end
 
     subgraph Caching
@@ -44,7 +46,9 @@ graph TB
     end
 
     Client --> App
-    App --> GuardIn
+    App --> Auth
+    Auth --> GuardIn
+    Auth --> ACL
     GuardIn --> Redis
     Redis --> Hybrid
     ADI --> Chunker --> DenseEmb --> Qdrant
@@ -54,6 +58,7 @@ graph TB
     DenseEmb --> BifrostOpenAI
     Reranker --> BifrostCohere
     Generator --> BifrostMeshAPI
+    ACL --> Qdrant
     App --> Logfire
 ```
 
@@ -69,7 +74,8 @@ graph TB
 | Vector store | Qdrant | Named vectors + RRF fusion |
 | Reranking | Cohere `rerank-english-v3.0` via Bifrost | Cross-encoder re-scoring |
 | Generation | MeshAPI `gpt-5.4` via Bifrost custom provider | Grounded answer synthesis |
-| Security | API key RBAC + LLM Guard sidecar | Role-based access control, input scanning, output groundedness |
+| Auth & RBAC | API key auth, 3 roles (reader/editor/admin) | Role-based endpoint access + document-level ACL |
+| Content safety | LLM Guard sidecar | Input scanning (prompt injection, PII), output groundedness (NLI) |
 | Gateway | Bifrost AI Gateway | Unified gateway for all provider traffic (OpenAI, MeshAPI, Cohere) |
 | Caching | Redis | 3-tier TTL cache |
 | Observability | Logfire + structlog | JSON logs + distributed traces |
