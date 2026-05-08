@@ -74,6 +74,8 @@ const el = {
   pageIndicator: document.querySelector("#pageIndicator"),
   apiKeyInput: document.querySelector("#apiKeyInput"),
   rolePreset: document.querySelector("#rolePreset"),
+  docsList: document.querySelector("#docsList"),
+  refreshDocsButton: document.querySelector("#refreshDocsButton"),
 };
 
 function getAuthHeaders() {
@@ -416,6 +418,71 @@ async function copyCitation() {
   }, 1200);
 }
 
+async function loadDocuments() {
+  const key = el.apiKeyInput?.value.trim();
+  if (!key) {
+    el.docsList.innerHTML = '<span class="muted">Enter an API key to see documents.</span>';
+    el.docsList.classList.add("empty");
+    return;
+  }
+  try {
+    const docs = await requestJson("/api/v1/documents", { headers: getAuthHeaders() });
+    renderDocuments(docs);
+  } catch (error) {
+    el.docsList.innerHTML = `<span class="muted">${escapeHtml(error.message)}</span>`;
+    el.docsList.classList.add("empty");
+  }
+}
+
+function renderDocuments(docs) {
+  el.docsList.innerHTML = "";
+  if (!docs.length) {
+    el.docsList.className = "docs-list empty";
+    el.docsList.textContent = "No documents found.";
+    return;
+  }
+  el.docsList.className = "docs-list";
+  for (const doc of docs) {
+    const card = document.createElement("div");
+    card.className = "doc-card";
+    card.innerHTML = `
+      <div class="doc-card-header">
+        <span class="doc-card-title">${escapeHtml(doc.doc_id)}</span>
+        <div class="doc-card-actions">
+          <button type="button" class="btn-sm" data-action="select" data-doc-id="${escapeHtml(doc.doc_id)}">Select</button>
+          <button type="button" class="btn-sm btn-danger" data-action="soft-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Soft Del</button>
+          <button type="button" class="btn-sm btn-danger" data-action="hard-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Hard Del</button>
+        </div>
+      </div>
+      <div class="doc-card-meta">${doc.total_chunks} chunks · ${escapeHtml(doc.active_version_id || "no active version")}</div>
+    `;
+    card.querySelectorAll("button[data-action]").forEach((btn) => {
+      btn.addEventListener("click", () => handleDocAction(btn.dataset.action, btn.dataset.docId));
+    });
+    el.docsList.appendChild(card);
+  }
+}
+
+async function handleDocAction(action, docId) {
+  if (action === "select") {
+    el.queryDocIds.value = docId;
+    window.localStorage.setItem("ragDemo.docId", docId);
+    return;
+  }
+  const mode = action === "soft-delete" ? "soft" : "hard";
+  const confirmed = confirm(`${mode === "hard" ? "Permanently" : "Soft"} delete "${docId}"?`);
+  if (!confirmed) return;
+  try {
+    await requestJson(`/api/v1/documents/${encodeURIComponent(docId)}?mode=${mode}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+    await loadDocuments();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
 async function loadPdf(file) {
   let pdfjsLib;
   try {
@@ -593,6 +660,7 @@ function restoreInputs() {
 el.apiKeyInput.addEventListener("input", () => {
   window.localStorage.setItem("ragDemo.apiKey", el.apiKeyInput.value.trim());
   el.rolePreset.value = "";
+  loadDocuments();
 });
 
 el.rolePreset.addEventListener("change", () => {
@@ -600,14 +668,19 @@ el.rolePreset.addEventListener("change", () => {
   if (preset) {
     el.apiKeyInput.value = preset;
     window.localStorage.setItem("ragDemo.apiKey", preset);
+    loadDocuments();
   }
 });
 
-el.uploadForm.addEventListener("submit", uploadDocument);
+el.uploadForm.addEventListener("submit", async (event) => {
+  await uploadDocument(event);
+  loadDocuments();
+});
 el.queryForm.addEventListener("submit", runQuery);
 el.copyCitationButton.addEventListener("click", copyCitation);
 el.prevPageButton.addEventListener("click", () => changePage(-1));
 el.nextPageButton.addEventListener("click", () => changePage(1));
+el.refreshDocsButton.addEventListener("click", loadDocuments);
 el.fileInput.addEventListener("change", async () => {
   const file = el.fileInput.files?.[0];
   if (file) {
@@ -620,3 +693,4 @@ restoreInputs();
 renderJobTimeline("queued", "idle");
 loadDemoConfig();
 checkHealth();
+loadDocuments();
