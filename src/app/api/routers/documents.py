@@ -11,7 +11,7 @@ from app.api.schemas import IngestResponse
 from app.cache.redis_cache import RedisCache
 from app.core.errors import ForbiddenError
 from app.core.settings import get_settings
-from app.security.auth import ROLE_ORDER, Principal, require_role
+from app.security.auth import ROLE_ORDER, Principal, require_role, verify_document_ownership
 from app.core.types import JobStage, JobState, JobStatus
 from app.ingestion.chunkers import get_chunker
 from app.ingestion.embedders.protocols import SparseVector
@@ -140,6 +140,15 @@ async def update_document(
     file: UploadFile = File(...),  # noqa: B008
 ):
     settings = get_settings()
+
+    qdrant_check = AsyncQdrantClient(url=settings.qdrant_url)
+    try:
+        await verify_document_ownership(
+            qdrant_check, settings.qdrant_collection, doc_id, principal
+        )
+    finally:
+        await qdrant_check.close()
+
     file_bytes = await file.read()
     version_id = make_version_id()
     job_id = make_job_id()
@@ -196,6 +205,14 @@ async def delete_document(
         raise ForbiddenError("hard delete requires admin role")
 
     settings = get_settings()
+
+    qdrant_check = AsyncQdrantClient(url=settings.qdrant_url)
+    try:
+        await verify_document_ownership(
+            qdrant_check, settings.qdrant_collection, doc_id, principal
+        )
+    finally:
+        await qdrant_check.close()
 
     redis_client = aioredis.from_url(settings.redis_url)
     cache = RedisCache(redis_client)
