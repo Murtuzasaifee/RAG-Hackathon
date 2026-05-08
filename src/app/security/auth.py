@@ -81,7 +81,9 @@ async def seed_api_key(redis, raw_key: str, role: str, label: str) -> str:
     existing = await redis.exists(redis_key)
     if existing:
         key_id = (await redis.hget(redis_key, "key_id")).decode()
-        logger.info("auth.seed.skipped", label=label, key_id=key_id, reason="already_exists")
+        logger.info(
+            "auth.seed.skipped", label=label, key_id=key_id, reason="already_exists"
+        )
         return key_id
 
     key_id = str(ULID())

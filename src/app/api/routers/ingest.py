@@ -9,7 +9,6 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 
 from app.api.schemas import IngestResponse, JobStatusResponse
 from app.cache.redis_cache import RedisCache
-from app.security.auth import ROLE_ORDER, Principal, require_role
 from app.core.settings import get_settings
 from app.core.types import JobStage, JobState, JobStatus
 from app.ingestion.chunkers import get_chunker
@@ -22,6 +21,7 @@ from app.ingestion.jobs import (
     now_utc,
 )
 from app.ingestion.parser import AzureDIParser
+from app.security.auth import ROLE_ORDER, Principal, require_role
 from app.versioning.manager import VersionManager
 
 logger = structlog.get_logger("app.api.ingest")
@@ -73,7 +73,13 @@ async def _run_ingest_pipeline(
         )
 
     try:
-        logger.info("ingest_started", job_id=job_id, doc_id=doc_id, version_id=version_id, file_size_bytes=len(file_bytes))
+        logger.info(
+            "ingest_started",
+            job_id=job_id,
+            doc_id=doc_id,
+            version_id=version_id,
+            file_size_bytes=len(file_bytes),
+        )
         await _update("running", "parsing", 10)
 
         parser = AzureDIParser(
@@ -123,9 +129,19 @@ async def _run_ingest_pipeline(
         )
         try:
             texts = [c.text for c in chunks]
-            logger.info("embedding_dense_started", job_id=job_id, doc_id=doc_id, n_texts=len(texts))
+            logger.info(
+                "embedding_dense_started",
+                job_id=job_id,
+                doc_id=doc_id,
+                n_texts=len(texts),
+            )
             dense_vectors = await bifrost.embed(texts, settings.embedding_model)
-            logger.info("embedding_dense_done", job_id=job_id, doc_id=doc_id, n_vectors=len(dense_vectors))
+            logger.info(
+                "embedding_dense_done",
+                job_id=job_id,
+                doc_id=doc_id,
+                n_vectors=len(dense_vectors),
+            )
 
             sparse_vectors: list[SparseVector] | None = None
             if settings.sparse_enabled:
@@ -133,10 +149,23 @@ async def _run_ingest_pipeline(
                 from app.ingestion.embedders.splade_sparse import (
                     SpladeSparseEmbedder,
                 )
-                logger.info("embedding_sparse_started", job_id=job_id, doc_id=doc_id, model=settings.splade_model)
-                sparse_embedder = SpladeSparseEmbedder(settings.splade_model, hf_token=settings.huggingface_token)
+
+                logger.info(
+                    "embedding_sparse_started",
+                    job_id=job_id,
+                    doc_id=doc_id,
+                    model=settings.splade_model,
+                )
+                sparse_embedder = SpladeSparseEmbedder(
+                    settings.splade_model, hf_token=settings.huggingface_token
+                )
                 sparse_vectors = await sparse_embedder.embed(texts)
-                logger.info("embedding_sparse_done", job_id=job_id, doc_id=doc_id, n_vectors=len(sparse_vectors))
+                logger.info(
+                    "embedding_sparse_done",
+                    job_id=job_id,
+                    doc_id=doc_id,
+                    n_vectors=len(sparse_vectors),
+                )
             else:
                 logger.info("embedding_sparse_skipped", job_id=job_id, doc_id=doc_id)
 
@@ -148,7 +177,12 @@ async def _run_ingest_pipeline(
                 indexer = QdrantIndexer(qdrant, settings.qdrant_collection)
                 await indexer.ensure_collection()
                 await indexer.upsert(
-                    chunks, dense_vectors, sparse_vectors, doc_id, version_id, owner_id=owner_id
+                    chunks,
+                    dense_vectors,
+                    sparse_vectors,
+                    doc_id,
+                    version_id,
+                    owner_id=owner_id,
                 )
                 logger.info(
                     "indexing_done",
@@ -173,12 +207,20 @@ async def _run_ingest_pipeline(
                 await qdrant2.close()
 
             await _update("done", "done", 100)
-            logger.info("ingest_complete", job_id=job_id, doc_id=doc_id, version_id=version_id, total_chunks=len(chunks))
+            logger.info(
+                "ingest_complete",
+                job_id=job_id,
+                doc_id=doc_id,
+                version_id=version_id,
+                total_chunks=len(chunks),
+            )
         finally:
             await bifrost.close()
 
     except Exception as exc:
-        logger.error("ingest_failed", job_id=job_id, doc_id=doc_id, error=str(exc), exc_info=True)
+        logger.error(
+            "ingest_failed", job_id=job_id, doc_id=doc_id, error=str(exc), exc_info=True
+        )
         await _update("failed", "failed", 0, error=str(exc))
 
 

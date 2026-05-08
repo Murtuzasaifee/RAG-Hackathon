@@ -11,7 +11,6 @@ from app.api.schemas import DocumentInfo, IngestResponse
 from app.cache.redis_cache import RedisCache
 from app.core.errors import ForbiddenError
 from app.core.settings import get_settings
-from app.security.auth import ROLE_ORDER, Principal, require_role, verify_document_ownership
 from app.core.types import JobStage, JobState, JobStatus
 from app.ingestion.chunkers import get_chunker
 from app.ingestion.embedders.protocols import SparseVector
@@ -23,6 +22,12 @@ from app.ingestion.jobs import (
     now_utc,
 )
 from app.ingestion.parser import AzureDIParser
+from app.security.auth import (
+    ROLE_ORDER,
+    Principal,
+    require_role,
+    verify_document_ownership,
+)
 from app.versioning.manager import VersionManager
 
 logger = structlog.get_logger("app.api.documents")
@@ -95,7 +100,9 @@ async def _run_reingest_pipeline(
                     SpladeSparseEmbedder,
                 )
 
-                sparse_embedder = SpladeSparseEmbedder(settings.splade_model, hf_token=settings.huggingface_token)
+                sparse_embedder = SpladeSparseEmbedder(
+                    settings.splade_model, hf_token=settings.huggingface_token
+                )
                 sparse_vectors = await sparse_embedder.embed(texts)
 
             await _update("running", "indexing", 80)
@@ -137,14 +144,17 @@ async def list_documents(
     principal: Annotated[Principal, Depends(require_role("reader"))],
 ):
     settings = get_settings()
-    owner_id = None if ROLE_ORDER.get(principal.role, -1) >= ROLE_ORDER["admin"] else principal.key_id
+    is_admin = ROLE_ORDER.get(principal.role, -1) >= ROLE_ORDER["admin"]
+    owner_id = None if is_admin else principal.key_id
 
     conditions: list[models.Condition] = [
         models.FieldCondition(key="active", match=models.MatchValue(value=True)),
     ]
     if owner_id is not None:
         conditions.append(
-            models.FieldCondition(key="owner_id", match=models.MatchValue(value=owner_id))
+            models.FieldCondition(
+                key="owner_id", match=models.MatchValue(value=owner_id)
+            )
         )
 
     qdrant = AsyncQdrantClient(url=settings.qdrant_url)
