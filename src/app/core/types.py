@@ -104,6 +104,7 @@ class JobStatus(BaseModel):
     stage: JobStage
     progress: int = 0
     error: str | None = None
+    owner_id: str | None = None
     created_at: datetime
     updated_at: datetime
 

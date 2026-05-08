@@ -23,6 +23,7 @@ class JobStatusResponse(BaseModel):
     stage: str
     progress: int = 0
     error: str | None = None
+    owner_id: str | None = None
 
 
 class QueryRequest(BaseModel):

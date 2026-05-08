@@ -55,6 +55,7 @@ async def _run_reingest_pipeline(
                 stage=stage,
                 progress=progress,
                 error=error,
+                owner_id=owner_id,
                 created_at=now_utc(),
                 updated_at=now_utc(),
             )
@@ -155,6 +156,7 @@ async def update_document(
             state="pending",
             stage="queued",
             progress=0,
+            owner_id=principal.key_id,
             created_at=now,
             updated_at=now,
         )

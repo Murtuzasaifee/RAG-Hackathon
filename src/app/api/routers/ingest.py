@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 
 from app.api.schemas import IngestResponse, JobStatusResponse
 from app.cache.redis_cache import RedisCache
-from app.security.auth import Principal, require_role
+from app.security.auth import ROLE_ORDER, Principal, require_role
 from app.core.settings import get_settings
 from app.core.types import JobStage, JobState, JobStatus
 from app.ingestion.chunkers import get_chunker
@@ -66,6 +66,7 @@ async def _run_ingest_pipeline(
                 stage=stage,
                 progress=progress,
                 error=error,
+                owner_id=owner_id,
                 created_at=now_utc(),
                 updated_at=now_utc(),
             )
@@ -209,6 +210,7 @@ async def ingest(
             state="pending",
             stage="queued",
             progress=0,
+            owner_id=principal.key_id,
             created_at=now,
             updated_at=now,
         )
@@ -248,6 +250,15 @@ async def get_job_status(
 
         raise HTTPException(status_code=404, detail="Job not found")
 
+    if (
+        ROLE_ORDER.get(principal.role, -1) < ROLE_ORDER["admin"]
+        and status.owner_id is not None
+        and status.owner_id != principal.key_id
+    ):
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Job not found")
+
     return JobStatusResponse(
         job_id=status.job_id,
         doc_id=status.doc_id,
@@ -256,4 +267,5 @@ async def get_job_status(
         stage=status.stage,
         progress=status.progress,
         error=status.error,
+        owner_id=status.owner_id,
     )
