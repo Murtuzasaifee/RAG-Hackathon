@@ -20,9 +20,14 @@ async def demo() -> FileResponse:
 
 
 @router.get("/demo/config", include_in_schema=False)
-async def demo_config() -> dict[str, str]:
+async def demo_config() -> dict:
     settings = get_settings()
     return {
         "bifrost_url": settings.bifrost_public_url or settings.bifrost_url,
         "logfire_project_url": settings.logfire_project_url,
+        "role_presets": [
+            {"label": "reader", "key": settings.demo_reader_key},
+            {"label": "editor", "key": settings.demo_editor_key},
+            {"label": "admin",  "key": settings.demo_admin_key},
+        ],
     }

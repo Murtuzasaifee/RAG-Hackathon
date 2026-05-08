@@ -72,7 +72,14 @@ const el = {
   prevPageButton: document.querySelector("#prevPageButton"),
   nextPageButton: document.querySelector("#nextPageButton"),
   pageIndicator: document.querySelector("#pageIndicator"),
+  apiKeyInput: document.querySelector("#apiKeyInput"),
+  rolePreset: document.querySelector("#rolePreset"),
 };
+
+function getAuthHeaders() {
+  const key = el.apiKeyInput?.value.trim();
+  return key ? { "X-API-Key": key } : {};
+}
 
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
@@ -123,9 +130,22 @@ async function loadDemoConfig() {
   try {
     const config = await requestJson("/demo/config");
     renderServiceLinks(config);
+    renderRolePresets(config.role_presets);
   } catch {
     el.serviceLinks.textContent = "";
   }
+}
+
+function renderRolePresets(presets) {
+  for (const opt of [...el.rolePreset.options].slice(1)) opt.remove();
+  for (const { label, key } of presets ?? []) {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = label;
+    el.rolePreset.appendChild(opt);
+  }
+  const savedKey = window.localStorage.getItem("ragDemo.apiKey") || "";
+  el.rolePreset.value = [...el.rolePreset.options].some((o) => o.value === savedKey) ? savedKey : "";
 }
 
 function renderServiceLinks(config) {
@@ -197,7 +217,7 @@ function formatElapsed(ms) {
 
 async function pollJob(jobId) {
   for (; ;) {
-    const job = await requestJson(`/jobs/${encodeURIComponent(jobId)}`);
+    const job = await requestJson(`/jobs/${encodeURIComponent(jobId)}`, { headers: getAuthHeaders() });
     updateJob(job);
     if (job.state === "done") {
       el.queryDocIds.value = job.doc_id;
@@ -243,6 +263,7 @@ async function uploadDocument(event) {
   try {
     const response = await requestJson("/ingest", {
       method: "POST",
+      headers: getAuthHeaders(),
       body: form,
     });
     updateJob({ ...response, state: "pending", stage: "queued", progress: 0 });
@@ -295,7 +316,7 @@ async function runQuery(event) {
     };
     const response = await requestJson("/api/v1/query", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(payload),
     });
 
@@ -566,7 +587,21 @@ async function changePage(delta) {
 function restoreInputs() {
   el.queryDocIds.value = window.localStorage.getItem("ragDemo.docId") || "";
   el.queryVersionIds.value = "";
+  el.apiKeyInput.value = window.localStorage.getItem("ragDemo.apiKey") || "";
 }
+
+el.apiKeyInput.addEventListener("input", () => {
+  window.localStorage.setItem("ragDemo.apiKey", el.apiKeyInput.value.trim());
+  el.rolePreset.value = "";
+});
+
+el.rolePreset.addEventListener("change", () => {
+  const preset = el.rolePreset.value;
+  if (preset) {
+    el.apiKeyInput.value = preset;
+    window.localStorage.setItem("ragDemo.apiKey", preset);
+  }
+});
 
 el.uploadForm.addEventListener("submit", uploadDocument);
 el.queryForm.addEventListener("submit", runQuery);

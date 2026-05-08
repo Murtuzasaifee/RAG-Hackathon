@@ -23,6 +23,22 @@
   <main class="layout">
     <aside class="sidebar">
       <section class="panel">
+        <h2>Auth</h2>
+        <div class="stack">
+          <label>
+            <span>Role preset</span>
+            <select id="rolePreset">
+              <option value="">— custom —</option>
+            </select>
+          </label>
+          <label>
+            <span>API Key</span>
+            <input id="apiKeyInput" type="password" placeholder="X-API-Key value" autocomplete="off" />
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>Document</h2>
         <form id="uploadForm" class="stack">
           <label>

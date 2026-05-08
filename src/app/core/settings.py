@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     sparse_enabled: bool = True
     auth_enabled: bool = True
     admin_api_key: str | None = None
+    demo_reader_key: str = "reader-test-key-abc123"
+    demo_editor_key: str = "editor-test-key-def456"
+    demo_admin_key: str = "admin-test-key-ghi789"
     llm_guard_input_enabled: bool = True
     llm_guard_output_enabled: bool = True
 
