@@ -15,6 +15,13 @@ class IngestResponse(BaseModel):
     version_id: str
 
 
+class DocumentInfo(BaseModel):
+    doc_id: str
+    active_version_id: str | None = None
+    total_chunks: int = 0
+    owner_id: str | None = None
+
+
 class JobStatusResponse(BaseModel):
     job_id: str
     doc_id: str
@@ -23,6 +30,7 @@ class JobStatusResponse(BaseModel):
     stage: str
     progress: int = 0
     error: str | None = None
+    owner_id: str | None = None
 
 
 class QueryRequest(BaseModel):

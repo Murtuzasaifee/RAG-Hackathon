@@ -13,6 +13,7 @@ class Retriever(Protocol):
         doc_ids: list[str] | None = None,
         version_ids: list[str] | None = None,
         top_k: int = 20,
+        owner_id: str | None = None,
     ) -> list[RetrievalHit]: ...
 
 

@@ -5,13 +5,12 @@ from typing import Annotated
 import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
-from qdrant_client import AsyncQdrantClient
+from qdrant_client import AsyncQdrantClient, models
 
-from app.api.schemas import IngestResponse
+from app.api.schemas import DocumentInfo, IngestResponse
 from app.cache.redis_cache import RedisCache
 from app.core.errors import ForbiddenError
 from app.core.settings import get_settings
-from app.security.auth import ROLE_ORDER, Principal, require_role
 from app.core.types import JobStage, JobState, JobStatus
 from app.ingestion.chunkers import get_chunker
 from app.ingestion.embedders.protocols import SparseVector
@@ -23,6 +22,12 @@ from app.ingestion.jobs import (
     now_utc,
 )
 from app.ingestion.parser import AzureDIParser
+from app.security.auth import (
+    ROLE_ORDER,
+    Principal,
+    require_role,
+    verify_document_ownership,
+)
 from app.versioning.manager import VersionManager
 
 logger = structlog.get_logger("app.api.documents")
@@ -55,6 +60,7 @@ async def _run_reingest_pipeline(
                 stage=stage,
                 progress=progress,
                 error=error,
+                owner_id=owner_id,
                 created_at=now_utc(),
                 updated_at=now_utc(),
             )
@@ -94,7 +100,9 @@ async def _run_reingest_pipeline(
                     SpladeSparseEmbedder,
                 )
 
-                sparse_embedder = SpladeSparseEmbedder(settings.splade_model, hf_token=settings.huggingface_token)
+                sparse_embedder = SpladeSparseEmbedder(
+                    settings.splade_model, hf_token=settings.huggingface_token
+                )
                 sparse_vectors = await sparse_embedder.embed(texts)
 
             await _update("running", "indexing", 80)
@@ -131,6 +139,52 @@ async def _run_reingest_pipeline(
         await _update("failed", "failed", 0, error=str(exc))
 
 
+@router.get("", response_model=list[DocumentInfo])
+async def list_documents(
+    principal: Annotated[Principal, Depends(require_role("reader"))],
+):
+    settings = get_settings()
+    is_admin = ROLE_ORDER.get(principal.role, -1) >= ROLE_ORDER["admin"]
+    owner_id = None if is_admin else principal.key_id
+
+    conditions: list[models.Condition] = [
+        models.FieldCondition(key="active", match=models.MatchValue(value=True)),
+    ]
+    if owner_id is not None:
+        conditions.append(
+            models.FieldCondition(
+                key="owner_id", match=models.MatchValue(value=owner_id)
+            )
+        )
+
+    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    try:
+        points, _ = await qdrant.scroll(
+            collection_name=settings.qdrant_collection,
+            scroll_filter=models.Filter(must=conditions),
+            limit=1000,
+            with_payload=["doc_id", "version_id", "owner_id"],
+        )
+    finally:
+        await qdrant.close()
+
+    docs: dict[str, dict] = {}
+    for point in points:
+        p = point.payload or {}
+        did = p.get("doc_id", "")
+        if did not in docs:
+            docs[did] = {
+                "doc_id": did,
+                "active_version_id": p.get("version_id"),
+                "total_chunks": 1,
+                "owner_id": p.get("owner_id"),
+            }
+        else:
+            docs[did]["total_chunks"] += 1
+
+    return [DocumentInfo(**d) for d in docs.values()]
+
+
 @router.put("/{doc_id}", response_model=IngestResponse)  # noqa: B008
 async def update_document(
     doc_id: str,
@@ -139,6 +193,15 @@ async def update_document(
     file: UploadFile = File(...),  # noqa: B008
 ):
     settings = get_settings()
+
+    qdrant_check = AsyncQdrantClient(url=settings.qdrant_url)
+    try:
+        await verify_document_ownership(
+            qdrant_check, settings.qdrant_collection, doc_id, principal
+        )
+    finally:
+        await qdrant_check.close()
+
     file_bytes = await file.read()
     version_id = make_version_id()
     job_id = make_job_id()
@@ -155,6 +218,7 @@ async def update_document(
             state="pending",
             stage="queued",
             progress=0,
+            owner_id=principal.key_id,
             created_at=now,
             updated_at=now,
         )
@@ -194,6 +258,14 @@ async def delete_document(
         raise ForbiddenError("hard delete requires admin role")
 
     settings = get_settings()
+
+    qdrant_check = AsyncQdrantClient(url=settings.qdrant_url)
+    try:
+        await verify_document_ownership(
+            qdrant_check, settings.qdrant_collection, doc_id, principal
+        )
+    finally:
+        await qdrant_check.close()
 
     redis_client = aioredis.from_url(settings.redis_url)
     cache = RedisCache(redis_client)

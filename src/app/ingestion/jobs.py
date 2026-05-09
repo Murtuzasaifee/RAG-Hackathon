@@ -23,20 +23,20 @@ class RedisJobStore:
 
     async def set_status(self, job: JobStatus) -> None:
         key = f"job:{job.job_id}"
-        await self._client.hset(
-            key,
-            mapping={
-                "job_id": job.job_id,
-                "doc_id": job.doc_id,
-                "version_id": job.version_id,
-                "state": job.state,
-                "stage": job.stage,
-                "progress": str(job.progress),
-                "error": job.error or "",
-                "created_at": job.created_at.isoformat(),
-                "updated_at": job.updated_at.isoformat(),
-            },
-        )
+        mapping = {
+            "job_id": job.job_id,
+            "doc_id": job.doc_id,
+            "version_id": job.version_id,
+            "state": job.state,
+            "stage": job.stage,
+            "progress": str(job.progress),
+            "error": job.error or "",
+            "created_at": job.created_at.isoformat(),
+            "updated_at": job.updated_at.isoformat(),
+        }
+        if job.owner_id is not None:
+            mapping["owner_id"] = job.owner_id
+        await self._client.hset(key, mapping=mapping)
 
     async def get_status(self, job_id: str) -> JobStatus | None:
         key = f"job:{job_id}"
@@ -52,6 +52,7 @@ class RedisJobStore:
             stage=decoded["stage"],
             progress=int(decoded["progress"]),
             error=decoded["error"] or None,
+            owner_id=decoded.get("owner_id"),
             created_at=datetime.fromisoformat(decoded["created_at"]),
             updated_at=datetime.fromisoformat(decoded["updated_at"]),
         )
