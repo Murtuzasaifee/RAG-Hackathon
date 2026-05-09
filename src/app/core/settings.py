@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -15,8 +16,14 @@ class Settings(BaseSettings):
     openai_api_key: str
     mesh_api_key: str
     cohere_api_key: str
-    logfire_token: str
+    logfire_token: str | None = None
     huggingface_token: str | None = None
+
+    otel_backend: Literal["logfire", "langfuse"] = "logfire"
+
+    langfuse_secret_key: str | None = None
+    langfuse_public_key: str | None = None
+    langfuse_base_url: str | None = None
 
     bifrost_url: str = "http://localhost:8080"
     bifrost_public_url: str | None = None
@@ -55,6 +62,12 @@ class Settings(BaseSettings):
     cache_ttl_answer: int = 3600
 
     qdrant_collection: str = "documents"
+
+    @property
+    def otel_project_url(self) -> str | None:
+        if self.otel_backend == "langfuse":
+            return self.langfuse_base_url
+        return self.logfire_project_url
 
 
 @lru_cache

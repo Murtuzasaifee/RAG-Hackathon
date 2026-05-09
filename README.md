@@ -12,7 +12,7 @@ LineageRAG is a production-grade Retrieval-Augmented Generation backend built wi
 graph TB
     Client["Client (curl / SDK / Demo UI)"]
     App["FastAPI App :8000"]
-    Logfire["Logfire (traces + logs)"]
+    Logfire["Logfire / Langfuse (traces + logs)"]
 
     subgraph Ingestion
         ADI["Azure Document Intelligence"]
@@ -59,8 +59,7 @@ graph TB
     Reranker --> BifrostCohere
     Generator --> BifrostMeshAPI
     ACL --> Qdrant
-    App --> Logfire
-```
+    App --> Logfire```
 
 ### Stack
 
@@ -78,7 +77,7 @@ graph TB
 | Content safety | LLM Guard sidecar | Input scanning (prompt injection, PII), output groundedness (NLI) |
 | Gateway | Bifrost AI Gateway | Unified gateway for all provider traffic (OpenAI, MeshAPI, Cohere) |
 | Caching | Redis | 3-tier TTL cache |
-| Observability | Logfire + structlog | JSON logs + distributed traces |
+| Observability | Logfire or Langfuse + structlog | Pluggable tracing backend, JSON logs + distributed traces |
 
 ## Prerequisites
 
@@ -88,7 +87,7 @@ graph TB
   - [OpenAI](https://platform.openai.com/api-keys) — embeddings via Bifrost
   - [MeshAPI](https://meshapi.ai) — LLM generation via Bifrost custom provider
   - [Cohere](https://dashboard.cohere.com/api-keys) — reranking via Bifrost
-  - [Logfire](https://logfire.pydantic.dev/) (free tier works)
+   - [Logfire](https://logfire.pydantic.dev/) (free tier works) **or** [Langfuse](https://cloud.langfuse.com/) (free tier works)
 
 ## Quickstart
 
@@ -122,7 +121,7 @@ The UI is intentionally simple and backend-focused:
 - Inspect returned citations with `doc_id`, `version_id`, page, section path, score, bbox, and chunk text.
 - Render the uploaded PDF in the browser and highlight citation bounding boxes when bbox data is available.
 - Show whether a query response was served from Redis answer cache.
-- Link directly to Bifrost and Logfire from the top bar.
+- Link directly to Bifrost and the active observability backend (Logfire or Langfuse) from the top bar.
 
 PDF preview uses the PDF file selected in the current browser session. If you refresh the page, query/citation metadata still works, but you need to re-select or re-upload the PDF to render the source preview again.
 
@@ -405,10 +404,22 @@ Input block → `400` with error details. Output concern → `warnings` array in
 
 ## Observability
 
-- **Logfire** — distributed traces with per-stage spans (`parse`, `embed.dense`, `embed.sparse`, `retrieve.hybrid`, `rerank`, `generate`, `guard.input`, `guard.output`, `gateway.embed`, `gateway.chat`)
+The tracing backend is **pluggable** — switch between Logfire and Langfuse via a single env var `OTEL_BACKEND`. All pipeline stages emit spans with the same granularity regardless of backend.
+
+### Backends
+
+| Backend | Config | Notes |
+|---------|--------|-------|
+| **Logfire** (default) | `OTEL_BACKEND=logfire` + `LOGFIRE_TOKEN` | Auto-instruments FastAPI, httpx, Pydantic |
+| **Langfuse Cloud** | `OTEL_BACKEND=langfuse` + `LANGFUSE_SECRET_KEY` + `LANGFUSE_PUBLIC_KEY` | Free tier (5k traces/mo); set `LANGFUSE_BASE_URL` for self-hosted |
+
+### Span coverage
+
+Per-stage spans: `parse`, `chunk`, `embed.dense`, `embed.sparse`, `index`, `retrieve.hybrid`, `rerank`, `generate`, `guard.input`, `guard.output`, `gateway.embed`, `gateway.chat`, `cache.lookup`, `cache.store`, `version.flip_active`, `version.soft_delete`, `version.hard_delete`
+
 - **structlog** — JSON-structured logs with request ID correlation, per-stage timing, hit counts, and score breakdowns
 - Every response includes `timings_ms` for full latency breakdown across all pipeline stages
-- The demo UI links to the configured Logfire project from `/demo/config`
+- The demo UI links to the active observability backend from `/demo/config`
 
 ## Configuration
 
@@ -421,8 +432,12 @@ All settings are env-var driven. See `.env.example` for the full list.
 | `OPENAI_API_KEY` | Yes | — | OpenAI API key (used by Bifrost for embeddings) |
 | `MESH_API_KEY` | Yes | — | MeshAPI key — read by Bifrost for LLM generation (custom provider) |
 | `COHERE_API_KEY` | Yes | — | Cohere API key — read by Bifrost for reranking |
-| `LOGFIRE_TOKEN` | Yes | — | Logfire token |
+| `LOGFIRE_TOKEN` | No* | — | Logfire token (*required when `OTEL_BACKEND=logfire`) |
 | `HUGGINGFACE_TOKEN` | No | — | HuggingFace token (required for gated SPLADE v3 model) |
+| `OTEL_BACKEND` | No | `logfire` | Tracing backend: `logfire` or `langfuse` |
+| `LANGFUSE_SECRET_KEY` | No* | — | Langfuse secret key (*required when `OTEL_BACKEND=langfuse`) |
+| `LANGFUSE_PUBLIC_KEY` | No* | — | Langfuse public key (*required when `OTEL_BACKEND=langfuse`) |
+| `LANGFUSE_BASE_URL` | No | `https://cloud.langfuse.com` | Langfuse host URL (change for self-hosted) |
 | `BIFROST_URL` | No | `http://localhost:8080` | Bifrost gateway URL |
 | `BIFROST_PUBLIC_URL` | No | — | Browser-visible Bifrost URL shown in the demo UI; falls back to `BIFROST_URL` |
 | `LOGFIRE_URL` | No | `https://logfire-us.pydantic.dev/msaifee/rag-hackathon` | Logfire project link shown in the demo UI |
@@ -473,7 +488,7 @@ uv run ruff check --fix src/ tests/ && uv run ruff format src/ tests/
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| App crashes on start | Missing required env vars | Ensure all 6 required keys are in `.env` |
+| App crashes on start | Missing required env vars | Ensure all required keys are in `.env` for your chosen `OTEL_BACKEND` |
 | Bifrost call fails "no keys found" | API key env var not set, or model not in explicit allowlist | Check `docker/bifrost/config.json` model lists and that all three keys (`OPENAI_API_KEY`, `MESH_API_KEY`, `COHERE_API_KEY`) are in `.env` |
 | SPLADE 401 on load | Gated HuggingFace repo | Set `HUGGINGFACE_TOKEN=hf_...` in `.env` |
 | SPLADE OOM on low-RAM machines | SPLADE model loads ~1 GB into memory | Set `SPARSE_ENABLED=false` in `.env` |
@@ -507,7 +522,7 @@ src/app/
 ├── frontend/               # Minimal static demo UI served at /demo
 ├── gateway/                # Bifrost client (embeddings + chat + rerank — all providers)
 ├── ingestion/              # Parser, chunker, embedders, indexer, jobs
-├── observability/          # Logfire spans, structlog config
+├── observability/          # Pluggable tracing (Logfire / Langfuse), structlog config
 ├── retrieval/              # Hybrid Qdrant retriever, Cohere reranker
 ├── security/               # LLM Guard client (input/output)
 └── versioning/             # Document version manager
