@@ -24,7 +24,8 @@ async def demo_config() -> dict:
     settings = get_settings()
     return {
         "bifrost_url": settings.bifrost_public_url or settings.bifrost_url,
-        "logfire_project_url": settings.logfire_project_url,
+        "observability_url": settings.otel_project_url,
+        "otel_backend": settings.otel_backend,
         "role_presets": [
             {"label": "reader",  "key": settings.demo_reader_key},
             {"label": "editor1",  "key": settings.demo_editor1_key},

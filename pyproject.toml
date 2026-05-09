@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.136.1",
     "httpx>=0.28.1",
     "hyperlink>=21.0.0",
+    "langfuse>=4.6.1",
     "logfire[httpx]>=4.32.1",
     "msgpack>=1.1.2",
     "openai>=2.33.0",

@@ -151,9 +151,10 @@ function renderRolePresets(presets) {
 }
 
 function renderServiceLinks(config) {
+  const obsLabel = config.otel_backend === "langfuse" ? "Langfuse" : "Logfire";
   const links = [
     ["Bifrost", config.bifrost_url],
-    ["Logfire", config.logfire_project_url],
+    [obsLabel, config.observability_url],
   ].filter(([, href]) => href);
 
   el.serviceLinks.innerHTML = "";
