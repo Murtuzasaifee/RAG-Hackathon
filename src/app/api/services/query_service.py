@@ -8,6 +8,7 @@ import structlog
 
 from app.api.schemas import CitationResponse, QueryRequest, QueryResponse
 from app.cache.protocols import CacheStore
+from app.cache.semantic_cache import SemanticQueryCache
 from app.core.errors import GuardError
 from app.generation.protocols import Generator
 from app.retrieval.protocols import Reranker, Retriever
@@ -49,6 +50,7 @@ class QueryService:
         output_guard: OutputGuard | None = None,
         cache: CacheStore | None = None,
         cache_ttl_answer: int = 3600,
+        semantic_cache: SemanticQueryCache | None = None,
     ) -> None:
         self._retriever = retriever
         self._reranker = reranker
@@ -57,6 +59,7 @@ class QueryService:
         self._output_guard = output_guard
         self._cache = cache
         self._cache_ttl_answer = cache_ttl_answer
+        self._semantic_cache = semantic_cache
 
         logger.info(
             "query_service.initialized",
@@ -64,6 +67,7 @@ class QueryService:
             output_guard_enabled=output_guard is not None,
             cache_enabled=cache is not None,
             cache_ttl_answer=cache_ttl_answer,
+            semantic_cache_enabled=semantic_cache is not None,
         )
 
     async def _compute_version_context(
@@ -147,6 +151,7 @@ class QueryService:
             epoch_map=epoch_map,
         )
 
+        # 1. Exact-match Redis cache check (cheapest — hash only, no embed call)
         if self._cache is not None:
             cache_key = _answer_cache_key(
                 query=request.query,
@@ -177,6 +182,37 @@ class QueryService:
                     cache_hit=True,
                 )
             logger.debug("query.cache_miss", request_id=request_id)
+
+        # 2. Semantic cache check (costs one embed call, skips retrieve+rerank+generate on hit)
+        query_vec: list[float] = []
+        if self._semantic_cache is not None:
+            try:
+                sem_response, query_vec = await self._semantic_cache.lookup(
+                    query=request.query,
+                    doc_ids=request.doc_ids,
+                    owner_id=owner_id,
+                    epoch_map=epoch_map,
+                    top_k=request.top_k,
+                    top_n=request.top_n,
+                )
+            except Exception as exc:
+                logger.warning("query.semantic_cache.error", request_id=request_id, error=str(exc))
+                sem_response = None
+            if sem_response is not None:
+                logger.info(
+                    "query.semantic_cache_hit",
+                    request_id=request_id,
+                    n_citations=len(sem_response.citations),
+                )
+                return QueryResponse(
+                    answer=sem_response.answer,
+                    citations=sem_response.citations,
+                    request_id=request_id,
+                    timings_ms={"semantic_cache_hit": 1},
+                    warnings=[],
+                    cache_hit=True,
+                )
+            logger.debug("query.semantic_cache_miss", request_id=request_id)
 
         t0 = time.perf_counter()
         logger.info(
@@ -293,6 +329,7 @@ class QueryService:
             for c in answer.citations
         ]
 
+        # Store in Redis exact-match cache
         if self._cache is not None:
             cache_key = _answer_cache_key(
                 query=request.query,
@@ -314,6 +351,21 @@ class QueryService:
                 self._cache_ttl_answer,
             )
             logger.debug("query.cache_stored", request_id=request_id)
+
+        # Store in semantic cache — reuses query_vec from lookup (no second embed call)
+        if self._semantic_cache is not None and query_vec:
+            await self._semantic_cache.store(
+                query=request.query,
+                doc_ids=request.doc_ids,
+                owner_id=owner_id,
+                epoch_map=epoch_map,
+                top_k=request.top_k,
+                top_n=request.top_n,
+                query_vec=query_vec,
+                answer_text=answer.text,
+                citations=citations,
+            )
+            logger.debug("query.semantic_cache_stored", request_id=request_id)
 
         total_ms = sum(timings.values())
         logger.info(

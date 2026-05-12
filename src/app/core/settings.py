@@ -60,8 +60,12 @@ class Settings(BaseSettings):
     cache_ttl_embed: int = 86400
     cache_ttl_rerank: int = 21600
     cache_ttl_answer: int = 3600
+    cache_ttl_sem_query: int = 3600
 
     qdrant_collection: str = "documents"
+    semantic_cache_enabled: bool = True
+    semantic_cache_threshold: float = 0.85
+    semantic_cache_collection: str = "query_cache"
 
     @property
     def otel_project_url(self) -> str | None:

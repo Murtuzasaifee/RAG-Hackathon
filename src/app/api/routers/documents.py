@@ -4,7 +4,7 @@ from typing import Annotated
 
 import redis.asyncio as aioredis
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from qdrant_client import AsyncQdrantClient, models
 
 from app.api.schemas import DocumentInfo, IngestResponse
@@ -130,6 +130,26 @@ async def _run_reingest_pipeline(
             finally:
                 await qdrant2.close()
 
+            if settings.semantic_cache_enabled:
+                from app.cache.semantic_cache import SemanticQueryCache
+                from app.ingestion.embedders.openai_dense import OpenAIDenseEmbedder
+                from app.gateway.bifrost import BifrostClient as _Bifrost
+
+                _bifrost = _Bifrost(base_url=settings.bifrost_url, api_key=settings.openai_api_key)
+                _embedder = OpenAIDenseEmbedder(_bifrost, settings.embedding_model)
+                _qdrant_inv = AsyncQdrantClient(url=settings.qdrant_url)
+                try:
+                    sc = SemanticQueryCache(
+                        client=_qdrant_inv,
+                        embedder=_embedder,
+                        collection=settings.semantic_cache_collection,
+                        threshold=settings.semantic_cache_threshold,
+                    )
+                    await sc.invalidate_doc(doc_id)
+                finally:
+                    await _qdrant_inv.close()
+                    await _bifrost.close()
+
             await _update("done", "done", 100)
         finally:
             await bifrost.close()
@@ -244,6 +264,7 @@ async def update_document(
 @router.delete("/{doc_id}")
 async def delete_document(
     doc_id: str,
+    request: Request,
     principal: Annotated[Principal, Depends(require_role("editor"))],
     mode: str = "soft",
     version_id: str | None = None,
@@ -284,6 +305,10 @@ async def delete_document(
                 detail=f"No points found for doc_id={doc_id}"
                 + (f" version_id={version_id}" if version_id else ""),
             )
+
+        semantic_cache = getattr(request.app.state, "semantic_cache", None)
+        if semantic_cache is not None:
+            await semantic_cache.invalidate_doc(doc_id)
 
         return {
             "doc_id": doc_id,
