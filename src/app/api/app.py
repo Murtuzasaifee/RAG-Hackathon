@@ -12,6 +12,7 @@ from app.api.middleware import RequestIdMiddleware
 from app.api.routers import demo, documents, eval, health, ingest, query
 from app.api.services.query_service import QueryService
 from app.cache.redis_cache import RedisCache
+from app.cache.semantic_cache import SemanticQueryCache
 from app.core.settings import get_settings
 from app.generation.generator import GroundedGenerator
 from app.gateway.bifrost import BifrostClient
@@ -58,6 +59,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     cache = RedisCache(redis_client)
     guard = LLMGuardClient(settings.llm_guard_url)
 
+    semantic_cache: SemanticQueryCache | None = None
+    if settings.semantic_cache_enabled:
+        semantic_cache = SemanticQueryCache(
+            client=qdrant,
+            embedder=dense_embedder,
+            collection=settings.semantic_cache_collection,
+            threshold=settings.semantic_cache_threshold,
+        )
+        await semantic_cache.ensure_collection()
+
     app.state.query_service = QueryService(
         retriever=retriever,
         reranker=reranker,
@@ -66,10 +77,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         output_guard=guard if settings.llm_guard_output_enabled else None,
         cache=cache,
         cache_ttl_answer=settings.cache_ttl_answer,
+        semantic_cache=semantic_cache,
     )
     app.state.redis = redis_client
     app.state.qdrant = qdrant
     app.state.bifrost = bifrost
+    app.state.semantic_cache = semantic_cache
 
     if not settings.auth_enabled:
         logger.warning(
