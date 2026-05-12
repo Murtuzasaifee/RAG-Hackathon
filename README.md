@@ -45,14 +45,14 @@ graph TB
     Client --> App
     App --> Auth
     Auth --> GuardIn
-    GuardIn --> SemanticCache
-    SemanticCache -->|"miss"| Redis
-    Redis -->|"miss"| Hybrid
+    GuardIn --> Redis
+    Redis -->|"hit"| App
+    Redis -->|"miss"| SemanticCache
+    SemanticCache -->|"hit"| App
+    SemanticCache -->|"miss"| Hybrid
     Hybrid --> Reranker --> Generator --> GuardOut
     GuardOut --> Redis
     GuardOut --> SemanticCache
-    SemanticCache -->|"hit"| App
-    Redis -->|"hit"| App
     GuardOut --> App
     App --> Client
 
@@ -344,10 +344,10 @@ Health check endpoint. Returns `{"status": "ok"}`.
 
 LineageRAG has a two-layer cache that short-circuits the pipeline at different points:
 
-| Layer | Backend | Skip scope | Key |
-|-------|---------|-----------|-----|
-| **Semantic query cache** | Qdrant `query_cache` collection | Entire pipeline (embed → retrieve → rerank → generate) | Cosine similarity ≥ threshold on query embedding |
-| **Exact-match answer cache** | Redis | Entire pipeline | SHA256 of query + filters + doc epoch |
+| Order | Layer | Backend | Skip scope | Key |
+|-------|-------|---------|-----------|-----|
+| 1st | **Exact-match answer cache** | Redis | Entire pipeline | SHA256 of query + filters + doc epoch — zero embed cost |
+| 2nd | **Semantic query cache** | Qdrant `query_cache` collection | Entire pipeline (retrieve → rerank → generate) | Cosine similarity ≥ threshold on query embedding |
 
 ### Semantic query cache
 

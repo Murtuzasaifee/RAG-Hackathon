@@ -151,38 +151,7 @@ class QueryService:
             epoch_map=epoch_map,
         )
 
-        # Semantic cache check (full-pipeline skip on similar queries)
-        query_vec: list[float] = []
-        if self._semantic_cache is not None:
-            try:
-                sem_response, query_vec = await self._semantic_cache.lookup(
-                    query=request.query,
-                    doc_ids=request.doc_ids,
-                    owner_id=owner_id,
-                    epoch_map=epoch_map,
-                    top_k=request.top_k,
-                    top_n=request.top_n,
-                )
-            except Exception as exc:
-                logger.warning("query.semantic_cache.error", request_id=request_id, error=str(exc))
-                sem_response = None
-            if sem_response is not None:
-                logger.info(
-                    "query.semantic_cache_hit",
-                    request_id=request_id,
-                    n_citations=len(sem_response.citations),
-                )
-                return QueryResponse(
-                    answer=sem_response.answer,
-                    citations=sem_response.citations,
-                    request_id=request_id,
-                    timings_ms={"semantic_cache_hit": 1},
-                    warnings=[],
-                    cache_hit=True,
-                )
-            logger.debug("query.semantic_cache_miss", request_id=request_id)
-
-        # Exact-match Redis cache check
+        # 1. Exact-match Redis cache check (cheapest — hash only, no embed call)
         if self._cache is not None:
             cache_key = _answer_cache_key(
                 query=request.query,
@@ -213,6 +182,37 @@ class QueryService:
                     cache_hit=True,
                 )
             logger.debug("query.cache_miss", request_id=request_id)
+
+        # 2. Semantic cache check (costs one embed call, skips retrieve+rerank+generate on hit)
+        query_vec: list[float] = []
+        if self._semantic_cache is not None:
+            try:
+                sem_response, query_vec = await self._semantic_cache.lookup(
+                    query=request.query,
+                    doc_ids=request.doc_ids,
+                    owner_id=owner_id,
+                    epoch_map=epoch_map,
+                    top_k=request.top_k,
+                    top_n=request.top_n,
+                )
+            except Exception as exc:
+                logger.warning("query.semantic_cache.error", request_id=request_id, error=str(exc))
+                sem_response = None
+            if sem_response is not None:
+                logger.info(
+                    "query.semantic_cache_hit",
+                    request_id=request_id,
+                    n_citations=len(sem_response.citations),
+                )
+                return QueryResponse(
+                    answer=sem_response.answer,
+                    citations=sem_response.citations,
+                    request_id=request_id,
+                    timings_ms={"semantic_cache_hit": 1},
+                    warnings=[],
+                    cache_hit=True,
+                )
+            logger.debug("query.semantic_cache_miss", request_id=request_id)
 
         t0 = time.perf_counter()
         logger.info(
