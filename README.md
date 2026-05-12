@@ -59,7 +59,8 @@ graph TB
     Reranker --> BifrostCohere
     Generator --> BifrostMeshAPI
     ACL --> Qdrant
-    App --> Logfire```
+    App --> Logfire
+  ```
 
 ### Stack
 
