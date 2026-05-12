@@ -19,48 +19,52 @@ graph TB
         Chunker["Document-Aware Chunker"]
         DenseEmb["Dense Embeddings (OpenAI)"]
         SparseEmb["SPLADE v3 Sparse Embeddings (local)"]
-        Qdrant["Qdrant (dense + sparse vectors)"]
+        QdrantDocs["Qdrant — documents collection"]
     end
 
-    subgraph Retrieval & Generation
-        Hybrid["Hybrid RRF Fusion"]
-        Reranker["Cohere Rerank (via Bifrost)"]
-        Generator["LLM Generation (MeshAPI via Bifrost)"]
+    subgraph Query Pipeline
+        GuardIn["LLM Guard — Input Scan"]
+        SemanticCache["Semantic Query Cache (Qdrant query_cache — full-pipeline skip)"]
+        Redis["Redis — exact-match answer cache"]
+        Hybrid["Hybrid RRF Fusion + ACL filter"]
+        Reranker["Cohere Rerank"]
+        Generator["LLM Generation (MeshAPI)"]
+        GuardOut["LLM Guard — Output Scan"]
     end
 
     subgraph Security
         Auth["API Key Auth + RBAC (reader / editor / admin)"]
-        ACL["Document ACL (owner_id filter)"]
-        GuardIn["LLM Guard — Input Scan"]
-        GuardOut["LLM Guard — Output Scan"]
     end
 
-    subgraph Caching
-        SemanticCache["Semantic Query Cache (Qdrant — full-pipeline skip)"]
-        Redis["Redis Cache (exact-match answer + embeddings + rerank)"]
-    end
-
-    subgraph Bifrost["Bifrost AI Gateway (all provider traffic)"]
+    subgraph Bifrost["Bifrost AI Gateway"]
         BifrostOpenAI["openai/ → OpenAI API"]
-        BifrostMeshAPI["meshapi/ → MeshAPI (custom provider)"]
+        BifrostMeshAPI["meshapi/ → MeshAPI"]
         BifrostCohere["cohere/ → Cohere API"]
     end
 
     Client --> App
     App --> Auth
     Auth --> GuardIn
-    Auth --> ACL
     GuardIn --> SemanticCache
-    SemanticCache --> Redis
-    Redis --> Hybrid
-    ADI --> Chunker --> DenseEmb --> Qdrant
-    Chunker --> SparseEmb --> Qdrant
+    SemanticCache -->|"miss"| Redis
+    Redis -->|"miss"| Hybrid
     Hybrid --> Reranker --> Generator --> GuardOut
     GuardOut --> Redis
+    GuardOut --> SemanticCache
+    SemanticCache -->|"hit"| App
+    Redis -->|"hit"| App
+    GuardOut --> App
+    App --> Client
+
+    ADI --> Chunker --> DenseEmb --> QdrantDocs
+    Chunker --> SparseEmb --> QdrantDocs
+    Hybrid --> QdrantDocs
+
+    SemanticCache --> BifrostOpenAI
     DenseEmb --> BifrostOpenAI
     Reranker --> BifrostCohere
     Generator --> BifrostMeshAPI
-    ACL --> Qdrant
+
     App --> Logfire
   ```
 
