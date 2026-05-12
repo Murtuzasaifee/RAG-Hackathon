@@ -36,7 +36,8 @@ graph TB
     end
 
     subgraph Caching
-        Redis["Redis Cache (3 layers)"]
+        SemanticCache["Semantic Query Cache (Qdrant — full-pipeline skip)"]
+        Redis["Redis Cache (exact-match answer + embeddings + rerank)"]
     end
 
     subgraph Bifrost["Bifrost AI Gateway (all provider traffic)"]
@@ -49,7 +50,8 @@ graph TB
     App --> Auth
     Auth --> GuardIn
     Auth --> ACL
-    GuardIn --> Redis
+    GuardIn --> SemanticCache
+    SemanticCache --> Redis
     Redis --> Hybrid
     ADI --> Chunker --> DenseEmb --> Qdrant
     Chunker --> SparseEmb --> Qdrant
@@ -77,7 +79,8 @@ graph TB
 | Auth & RBAC | API key auth, 3 roles (reader/editor/admin) | Role-based endpoint access + document-level ACL |
 | Content safety | LLM Guard sidecar | Input scanning (prompt injection, PII), output groundedness (NLI) |
 | Gateway | Bifrost AI Gateway | Unified gateway for all provider traffic (OpenAI, MeshAPI, Cohere) |
-| Caching | Redis | 3-tier TTL cache |
+| Semantic query cache | Qdrant (`query_cache` collection) | Full-pipeline skip for semantically similar queries (cosine similarity) |
+| Exact-match cache | Redis | SHA256 answer cache + embedding cache + rerank cache (TTL-based) |
 | Observability | Logfire or Langfuse + structlog | Pluggable tracing backend, JSON logs + distributed traces |
 
 ## Prerequisites
@@ -333,6 +336,33 @@ curl -X DELETE "http://localhost:8000/documents/my-doc-1?mode=soft&version_id=01
 
 Health check endpoint. Returns `{"status": "ok"}`.
 
+## Caching
+
+LineageRAG has a two-layer cache that short-circuits the pipeline at different points:
+
+| Layer | Backend | Skip scope | Key |
+|-------|---------|-----------|-----|
+| **Semantic query cache** | Qdrant `query_cache` collection | Entire pipeline (embed → retrieve → rerank → generate) | Cosine similarity ≥ threshold on query embedding |
+| **Exact-match answer cache** | Redis | Entire pipeline | SHA256 of query + filters + doc epoch |
+
+### Semantic query cache
+
+Before running the pipeline, the app embeds the incoming query and searches the `query_cache` Qdrant collection for a cosine-similar prior query. A hit (similarity ≥ `SEMANTIC_CACHE_THRESHOLD`) with a matching `epoch_map` returns the stored answer immediately — no Qdrant document retrieval, no Cohere rerank, no LLM call.
+
+**Invalidation:** When a document is deleted or re-ingested, all `query_cache` entries that reference that `doc_id` are deleted via Qdrant payload filter. The epoch-map stored on each entry also serves as a staleness guard: if a document's epoch was bumped since the entry was stored, the entry is treated as a miss.
+
+**Cache hit flag:** `cache_hit: true` in the `QueryResponse` indicates either layer hit.
+
+**Configuration:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SEMANTIC_CACHE_ENABLED` | `true` | Enable/disable semantic query cache |
+| `SEMANTIC_CACHE_THRESHOLD` | `0.85` | Cosine similarity minimum for a cache hit |
+| `SEMANTIC_CACHE_COLLECTION` | `query_cache` | Qdrant collection name for cached queries |
+
+The `query_cache` collection is created automatically on startup. To clear it entirely: `DELETE /collections/query_cache` via Qdrant REST API (port 6333), then restart the app.
+
 ## Document Versioning
 
 All Qdrant points carry `(doc_id, version_id, active)` payload. Default retrieval filters `active == True`.
@@ -454,6 +484,9 @@ All settings are env-var driven. See `.env.example` for the full list.
 | `LLM_GUARD_OUTPUT_ENABLED` | No | `true` | Enable/disable output groundedness scanning |
 | `CHUNK_MAX_TOKENS` | No | `512` | Max tokens per chunk |
 | `CACHE_TTL_ANSWER` | No | `3600` | Answer cache TTL (seconds) |
+| `SEMANTIC_CACHE_ENABLED` | No | `true` | Enable semantic query cache (Qdrant-backed cosine similarity) |
+| `SEMANTIC_CACHE_THRESHOLD` | No | `0.85` | Cosine similarity threshold for semantic cache hit |
+| `SEMANTIC_CACHE_COLLECTION` | No | `query_cache` | Qdrant collection for semantic query cache |
 
 ## Development
 
@@ -517,7 +550,7 @@ src/app/
 │   ├── routers/            # ingest, query, documents, health, demo
 │   ├── services/           # QueryService orchestration
 │   └── schemas.py          # Pydantic request/response models
-├── cache/                  # Redis cache (3-tier TTL)
+├── cache/                  # Semantic query cache (Qdrant) + Redis exact-match cache
 ├── core/                   # Settings, types, errors
 ├── generation/             # Grounded LLM generation
 ├── frontend/               # Minimal static demo UI served at /demo
