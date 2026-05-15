@@ -1,4 +1,6 @@
 const state = {
+  apiKey: "",
+  role: "",
   currentFile: null,
   pdfDoc: null,
   currentPage: 1,
@@ -7,6 +9,7 @@ const state = {
   citations: [],
   jobStartedAt: null,
   jobElapsedTimer: null,
+  rolePresets: [],
 };
 
 const PDFJS_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
@@ -34,13 +37,29 @@ const JOB_DETAIL = {
   failed: "Ingestion failed. Check the error message below.",
 };
 
+const ROLE_META = {
+  reader: { icon: "reader", desc: "Query documents" },
+  editor1: { icon: "editor", desc: "Upload & query" },
+  editor2: { icon: "editor", desc: "Upload & query" },
+  admin: { icon: "admin", desc: "Full access" },
+};
+
 const el = {
+  loginScreen: document.querySelector("#loginScreen"),
+  appScreen: document.querySelector("#appScreen"),
+  roleCards: document.querySelector("#roleCards"),
+  manualLoginForm: document.querySelector("#manualLoginForm"),
+  manualApiKey: document.querySelector("#manualApiKey"),
   healthStatus: document.querySelector("#healthStatus"),
   serviceLinks: document.querySelector("#serviceLinks"),
+  userRole: document.querySelector("#userRole"),
+  logoutButton: document.querySelector("#logoutButton"),
   uploadForm: document.querySelector("#uploadForm"),
   fileInput: document.querySelector("#fileInput"),
   docIdInput: document.querySelector("#docIdInput"),
   uploadButton: document.querySelector("#uploadButton"),
+  dropZone: document.querySelector("#dropZone"),
+  fileName: document.querySelector("#fileName"),
   jobState: document.querySelector("#jobState"),
   jobStage: document.querySelector("#jobStage"),
   jobProgress: document.querySelector("#jobProgress"),
@@ -72,25 +91,15 @@ const el = {
   prevPageButton: document.querySelector("#prevPageButton"),
   nextPageButton: document.querySelector("#nextPageButton"),
   pageIndicator: document.querySelector("#pageIndicator"),
-  apiKeyInput: document.querySelector("#apiKeyInput"),
-  rolePreset: document.querySelector("#rolePreset"),
   docsList: document.querySelector("#docsList"),
   refreshDocsButton: document.querySelector("#refreshDocsButton"),
 };
 
 function getAuthHeaders() {
-  const key = el.apiKeyInput?.value.trim();
-  return key ? { "X-API-Key": key } : {};
+  return state.apiKey ? { "X-API-Key": state.apiKey } : {};
 }
 
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
-
-function setHealth(ok, text) {
-  el.healthStatus.textContent = text;
-  el.healthStatus.className = `status ${ok ? "status-ok" : "status-error"}`;
-  el.uploadButton.disabled = !ok;
-  el.askButton.disabled = !ok;
-}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -118,6 +127,40 @@ async function requestJson(url, options = {}) {
   return payload;
 }
 
+function setHealth(ok, text) {
+  el.healthStatus.textContent = text;
+  el.healthStatus.className = `health-badge ${ok ? "health-ok" : "health-error"}`;
+  el.uploadButton.disabled = !ok;
+  el.askButton.disabled = !ok;
+}
+
+function setRole(role) {
+  state.role = role || "custom";
+  el.userRole.textContent = state.role;
+}
+
+function login(apiKey, role) {
+  state.apiKey = apiKey;
+  window.localStorage.setItem("ragDemo.apiKey", apiKey);
+  setRole(role);
+  el.loginScreen.classList.add("hidden");
+  el.appScreen.classList.remove("hidden");
+  el.appScreen.style.animation = "fadeInFast 0.3s ease-out";
+  checkHealth();
+  loadDocuments();
+  restoreInputs();
+  renderJobTimeline("queued", "idle");
+}
+
+function logout() {
+  state.apiKey = "";
+  state.role = "";
+  window.localStorage.removeItem("ragDemo.apiKey");
+  el.appScreen.classList.add("hidden");
+  el.loginScreen.classList.remove("hidden");
+  el.loginScreen.style.animation = "fadeInFast 0.3s ease-out";
+}
+
 async function checkHealth() {
   try {
     await requestJson("/health");
@@ -132,22 +175,40 @@ async function loadDemoConfig() {
   try {
     const config = await requestJson("/demo/config");
     renderServiceLinks(config);
-    renderRolePresets(config.role_presets);
+    state.rolePresets = config.role_presets || [];
+    renderRoleCards(state.rolePresets);
+
+    const savedKey = window.localStorage.getItem("ragDemo.apiKey") || "";
+    if (savedKey) {
+      const matched = state.rolePresets.find((p) => p.key === savedKey);
+      if (matched) {
+        login(savedKey, matched.label);
+        return;
+      }
+      el.manualApiKey.value = savedKey;
+    }
   } catch {
     el.serviceLinks.textContent = "";
   }
 }
 
-function renderRolePresets(presets) {
-  for (const opt of [...el.rolePreset.options].slice(1)) opt.remove();
-  for (const { label, key } of presets ?? []) {
-    const opt = document.createElement("option");
-    opt.value = key;
-    opt.textContent = label;
-    el.rolePreset.appendChild(opt);
+function renderRoleCards(presets) {
+  el.roleCards.innerHTML = "";
+  for (const { label, key } of presets) {
+    const meta = ROLE_META[label] || ROLE_META["reader"];
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "role-card";
+    card.innerHTML = `
+      <div class="role-card-icon ${meta.icon}">
+        ${label === "reader" ? "&#128218;" : label.startsWith("editor") ? "&#9997;&#65039;" : "&#128272;"}
+      </div>
+      <div class="role-card-name">${escapeHtml(label)}</div>
+      <div class="role-card-desc">${escapeHtml(meta.desc)}</div>
+    `;
+    card.addEventListener("click", () => login(key, label));
+    el.roleCards.appendChild(card);
   }
-  const savedKey = window.localStorage.getItem("ragDemo.apiKey") || "";
-  el.rolePreset.value = [...el.rolePreset.options].some((o) => o.value === savedKey) ? savedKey : "";
 }
 
 function renderServiceLinks(config) {
@@ -177,7 +238,7 @@ function updateJob(job) {
   renderJobTimeline(job.stage, job.state);
   el.jobDetail.textContent = JOB_DETAIL[job.stage] || JOB_DETAIL[job.state] || "Working";
   el.jobDetail.classList.toggle("running", job.state === "pending" || job.state === "running");
-  el.jobMeta.textContent = `doc_id=${job.doc_id} · version_id=${job.version_id}`;
+  el.jobMeta.textContent = `doc_id=${job.doc_id} \u00b7 version_id=${job.version_id}`;
 }
 
 function startJobClock() {
@@ -219,7 +280,7 @@ function formatElapsed(ms) {
 }
 
 async function pollJob(jobId) {
-  for (; ;) {
+  for (;;) {
     const job = await requestJson(`/jobs/${encodeURIComponent(jobId)}`, { headers: getAuthHeaders() });
     updateJob(job);
     if (job.state === "done") {
@@ -341,9 +402,9 @@ async function runQuery(event) {
 
 function citationTitle(citation) {
   const section = citation.section_path?.length
-    ? ` · ${citation.section_path.join(" > ")}`
+    ? ` \u00b7 ${citation.section_path.join(" > ")}`
     : "";
-  return `${citation.doc_id} · page ${citation.page}${section}`;
+  return `${citation.doc_id} \u00b7 page ${citation.page}${section}`;
 }
 
 function snippet(text, maxLength = 220) {
@@ -373,7 +434,7 @@ function renderCitations(citations) {
     card.className = "citation-card";
     card.innerHTML = `
       <div class="citation-title">${escapeHtml(citationTitle(citation))}</div>
-      <div class="citation-meta">score ${Number(citation.score || 0).toFixed(3)} · ${escapeHtml(citation.chunk_type || "text")} · ${escapeHtml(citation.version_id)}</div>
+      <div class="citation-meta">score ${Number(citation.score || 0).toFixed(3)} \u00b7 ${escapeHtml(citation.chunk_type || "text")} \u00b7 ${escapeHtml(citation.version_id)}</div>
       <div class="citation-snippet">${escapeHtml(snippet(citation.chunk_text))}</div>
     `;
     card.addEventListener("click", () => selectCitation(index));
@@ -420,9 +481,8 @@ async function copyCitation() {
 }
 
 async function loadDocuments() {
-  const key = el.apiKeyInput?.value.trim();
-  if (!key) {
-    el.docsList.innerHTML = '<span class="muted">Enter an API key to see documents.</span>';
+  if (!state.apiKey) {
+    el.docsList.innerHTML = '<span class="text-muted">Sign in to see documents.</span>';
     el.docsList.classList.add("empty");
     return;
   }
@@ -430,7 +490,7 @@ async function loadDocuments() {
     const docs = await requestJson("/documents", { headers: getAuthHeaders() });
     renderDocuments(docs);
   } catch (error) {
-    el.docsList.innerHTML = `<span class="muted">${escapeHtml(error.message)}</span>`;
+    el.docsList.innerHTML = `<span class="text-muted">${escapeHtml(error.message)}</span>`;
     el.docsList.classList.add("empty");
   }
 }
@@ -450,12 +510,12 @@ function renderDocuments(docs) {
       <div class="doc-card-header">
         <span class="doc-card-title">${escapeHtml(doc.doc_id)}</span>
         <div class="doc-card-actions">
-          <button type="button" class="btn-sm" data-action="select" data-doc-id="${escapeHtml(doc.doc_id)}">Select</button>
-          <button type="button" class="btn-sm btn-danger" data-action="soft-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Soft Del</button>
-          <button type="button" class="btn-sm btn-danger" data-action="hard-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Hard Del</button>
+          <button type="button" class="btn btn-ghost btn-xs" data-action="select" data-doc-id="${escapeHtml(doc.doc_id)}">Select</button>
+          <button type="button" class="btn btn-danger btn-xs" data-action="soft-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Soft</button>
+          <button type="button" class="btn btn-danger btn-xs" data-action="hard-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Hard</button>
         </div>
       </div>
-      <div class="doc-card-meta">${doc.total_chunks} chunks · ${escapeHtml(doc.active_version_id || "no active version")}</div>
+      <div class="doc-card-meta">${doc.total_chunks} chunks \u00b7 ${escapeHtml(doc.active_version_id || "no active version")}</div>
     `;
     card.querySelectorAll("button[data-action]").forEach((btn) => {
       btn.addEventListener("click", () => handleDocAction(btn.dataset.action, btn.dataset.docId));
@@ -578,8 +638,8 @@ function drawOverlay(citation, pageMetrics) {
     rect.setAttribute("y", String(y0 * pageMetrics.renderedHeight));
     rect.setAttribute("width", String(Math.max(2, (x1 - x0) * pageMetrics.renderedWidth)));
     rect.setAttribute("height", String(Math.max(2, (y1 - y0) * pageMetrics.renderedHeight)));
-    rect.setAttribute("fill", "rgba(11, 107, 203, 0.18)");
-    rect.setAttribute("stroke", "#0b6bcb");
+    rect.setAttribute("fill", "rgba(59, 130, 246, 0.18)");
+    rect.setAttribute("stroke", "#3b82f6");
     rect.setAttribute("stroke-width", "2");
     el.overlayLayer.appendChild(rect);
     return;
@@ -594,8 +654,8 @@ function drawOverlay(citation, pageMetrics) {
     }
     const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
     polygon.setAttribute("points", points.join(" "));
-    polygon.setAttribute("fill", "rgba(11, 107, 203, 0.18)");
-    polygon.setAttribute("stroke", "#0b6bcb");
+    polygon.setAttribute("fill", "rgba(59, 130, 246, 0.18)");
+    polygon.setAttribute("stroke", "#3b82f6");
     polygon.setAttribute("stroke-width", "2");
     el.overlayLayer.appendChild(polygon);
   }
@@ -655,43 +715,63 @@ async function changePage(delta) {
 function restoreInputs() {
   el.queryDocIds.value = window.localStorage.getItem("ragDemo.docId") || "";
   el.queryVersionIds.value = "";
-  el.apiKeyInput.value = window.localStorage.getItem("ragDemo.apiKey") || "";
 }
 
-el.apiKeyInput.addEventListener("input", () => {
-  window.localStorage.setItem("ragDemo.apiKey", el.apiKeyInput.value.trim());
-  el.rolePreset.value = "";
-  loadDocuments();
+function setupDropZone() {
+  const zone = el.dropZone;
+  if (!zone) return;
+
+  zone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    zone.classList.add("drag-over");
+  });
+
+  zone.addEventListener("dragleave", () => {
+    zone.classList.remove("drag-over");
+  });
+
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    zone.classList.remove("drag-over");
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type === "application/pdf") {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      el.fileInput.files = dt.files;
+      el.fileName.textContent = file.name;
+      state.currentFile = file;
+      loadPdf(file).catch(() => {});
+    }
+  });
+}
+
+el.manualLoginForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const key = el.manualApiKey.value.trim();
+  if (key) login(key, "custom");
 });
 
-el.rolePreset.addEventListener("change", () => {
-  const preset = el.rolePreset.value;
-  if (preset) {
-    el.apiKeyInput.value = preset;
-    window.localStorage.setItem("ragDemo.apiKey", preset);
-    loadDocuments();
-  }
-});
+el.logoutButton.addEventListener("click", logout);
 
 el.uploadForm.addEventListener("submit", async (event) => {
   await uploadDocument(event);
   loadDocuments();
 });
+
 el.queryForm.addEventListener("submit", runQuery);
 el.copyCitationButton.addEventListener("click", copyCitation);
 el.prevPageButton.addEventListener("click", () => changePage(-1));
 el.nextPageButton.addEventListener("click", () => changePage(1));
 el.refreshDocsButton.addEventListener("click", loadDocuments);
+
 el.fileInput.addEventListener("change", async () => {
   const file = el.fileInput.files?.[0];
   if (file) {
+    el.fileName.textContent = file.name;
     state.currentFile = file;
     await loadPdf(file);
   }
 });
 
-restoreInputs();
-renderJobTimeline("queued", "idle");
+setupDropZone();
 loadDemoConfig();
-checkHealth();
-loadDocuments();
