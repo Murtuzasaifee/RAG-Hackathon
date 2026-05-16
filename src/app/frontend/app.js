@@ -173,11 +173,7 @@ async function loadDemoConfig() {
     renderRoleCards(state.rolePresets);
 
     const savedKey = window.localStorage.getItem("ragDemo.apiKey") || "";
-    if (savedKey) {
-      const match = state.rolePresets.find((p) => p.key === savedKey);
-      if (match) { login(savedKey, match.label); return; }
-      el.manualApiKey.value = savedKey;
-    }
+    if (savedKey) el.manualApiKey.value = savedKey;
   } catch { el.serviceLinks.textContent = ""; }
 }
 
@@ -573,6 +569,7 @@ function autoResizeTextarea() {
 function setupDropZone() {
   const zone = el.dropZone;
   if (!zone) return;
+  zone.addEventListener("click", () => el.fileInput.click());
   zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag-over"); });
   zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
   zone.addEventListener("drop", (e) => {
