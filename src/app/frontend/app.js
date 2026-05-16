@@ -37,115 +37,110 @@ const JOB_DETAIL = {
   failed: "Ingestion failed. Check the error message below.",
 };
 
-const ROLE_META = {
-  reader: { icon: "reader", desc: "Query documents" },
-  editor1: { icon: "editor", desc: "Upload & query" },
-  editor2: { icon: "editor", desc: "Upload & query" },
-  admin: { icon: "admin", desc: "Full access" },
+const ROLE_DESC = {
+  reader: "Query documents",
+  editor1: "Upload & query",
+  editor2: "Upload & query",
+  admin: "Full access",
 };
 
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
 const el = {
-  loginScreen: document.querySelector("#loginScreen"),
-  appScreen: document.querySelector("#appScreen"),
-  roleCards: document.querySelector("#roleCards"),
-  manualLoginForm: document.querySelector("#manualLoginForm"),
-  manualApiKey: document.querySelector("#manualApiKey"),
-  healthStatus: document.querySelector("#healthStatus"),
-  serviceLinks: document.querySelector("#serviceLinks"),
-  userRole: document.querySelector("#userRole"),
-  logoutButton: document.querySelector("#logoutButton"),
-  uploadForm: document.querySelector("#uploadForm"),
-  fileInput: document.querySelector("#fileInput"),
-  docIdInput: document.querySelector("#docIdInput"),
-  uploadButton: document.querySelector("#uploadButton"),
-  dropZone: document.querySelector("#dropZone"),
-  fileName: document.querySelector("#fileName"),
-  jobState: document.querySelector("#jobState"),
-  jobStage: document.querySelector("#jobStage"),
-  jobProgress: document.querySelector("#jobProgress"),
-  jobElapsed: document.querySelector("#jobElapsed"),
-  jobBar: document.querySelector("#jobBar"),
-  jobDetail: document.querySelector("#jobDetail"),
-  jobTimeline: document.querySelector("#jobTimeline"),
-  jobMeta: document.querySelector("#jobMeta"),
-  queryForm: document.querySelector("#queryForm"),
-  queryInput: document.querySelector("#queryInput"),
-  queryDocIds: document.querySelector("#queryDocIds"),
-  queryVersionIds: document.querySelector("#queryVersionIds"),
-  topKInput: document.querySelector("#topKInput"),
-  topNInput: document.querySelector("#topNInput"),
-  askButton: document.querySelector("#askButton"),
-  answerOutput: document.querySelector("#answerOutput"),
-  requestMeta: document.querySelector("#requestMeta"),
-  cacheStatus: document.querySelector("#cacheStatus"),
-  warningOutput: document.querySelector("#warningOutput"),
-  timingOutput: document.querySelector("#timingOutput"),
-  citationList: document.querySelector("#citationList"),
-  citationCount: document.querySelector("#citationCount"),
-  sourceDetail: document.querySelector("#sourceDetail"),
-  copyCitationButton: document.querySelector("#copyCitationButton"),
-  pdfMessage: document.querySelector("#pdfMessage"),
-  pdfViewport: document.querySelector("#pdfViewport"),
-  pdfCanvas: document.querySelector("#pdfCanvas"),
-  overlayLayer: document.querySelector("#overlayLayer"),
-  prevPageButton: document.querySelector("#prevPageButton"),
-  nextPageButton: document.querySelector("#nextPageButton"),
-  pageIndicator: document.querySelector("#pageIndicator"),
-  docsList: document.querySelector("#docsList"),
-  refreshDocsButton: document.querySelector("#refreshDocsButton"),
+  loginView: $("#loginView"),
+  appView: $("#appView"),
+  roleCards: $("#roleCards"),
+  manualLoginForm: $("#manualLoginForm"),
+  manualApiKey: $("#manualApiKey"),
+  healthStatus: $("#healthStatus"),
+  serviceLinks: $("#serviceLinks"),
+  userRole: $("#userRole"),
+  logoutButton: $("#logoutButton"),
+  uploadForm: $("#uploadForm"),
+  fileInput: $("#fileInput"),
+  docIdInput: $("#docIdInput"),
+  uploadButton: $("#uploadButton"),
+  dropZone: $("#dropZone"),
+  fileName: $("#fileName"),
+  openIngest: $("#openIngest"),
+  closeIngest: $("#closeIngest"),
+  ingestOverlay: $("#ingestOverlay"),
+  ingestBackdrop: $("#ingestBackdrop"),
+  jobState: $("#jobState"),
+  jobStage: $("#jobStage"),
+  jobProgress: $("#jobProgress"),
+  jobElapsed: $("#jobElapsed"),
+  jobBar: $("#jobBar"),
+  jobDetail: $("#jobDetail"),
+  jobTimeline: $("#jobTimeline"),
+  jobMeta: $("#jobMeta"),
+  queryForm: $("#queryForm"),
+  queryInput: $("#queryInput"),
+  queryDocIds: $("#queryDocIds"),
+  queryVersionIds: $("#queryVersionIds"),
+  topKInput: $("#topKInput"),
+  topNInput: $("#topNInput"),
+  askButton: $("#askButton"),
+  answerOutput: $("#answerOutput"),
+  requestMeta: $("#requestMeta"),
+  cacheStatus: $("#cacheStatus"),
+  warningOutput: $("#warningOutput"),
+  timingOutput: $("#timingOutput"),
+  citationList: $("#citationList"),
+  citationCount: $("#citationCount"),
+  sourceDetail: $("#sourceDetail"),
+  copyCitationButton: $("#copyCitationButton"),
+  pdfMessage: $("#pdfMessage"),
+  pdfViewport: $("#pdfViewport"),
+  pdfCanvas: $("#pdfCanvas"),
+  overlayLayer: $("#overlayLayer"),
+  prevPageButton: $("#prevPageButton"),
+  nextPageButton: $("#nextPageButton"),
+  pageIndicator: $("#pageIndicator"),
+  docsList: $("#docsList"),
+  refreshDocsButton: $("#refreshDocsButton"),
 };
 
 function getAuthHeaders() {
   return state.apiKey ? { "X-API-Key": state.apiKey } : {};
 }
 
-const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function escapeHtml(v) {
+  return String(v ?? "")
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
-function parseCsv(value) {
-  const items = value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+function parseCsv(v) {
+  const items = v.split(",").map((s) => s.trim()).filter(Boolean);
   return items.length ? items : null;
 }
 
-async function requestJson(url, options = {}) {
-  const response = await fetch(url, options);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.message || payload.detail || `Request failed: ${response.status}`);
-  }
-  return payload;
+async function requestJson(url, opts = {}) {
+  const res = await fetch(url, opts);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.message || body.detail || `Request failed: ${res.status}`);
+  return body;
 }
 
 function setHealth(ok, text) {
-  el.healthStatus.textContent = text;
-  el.healthStatus.className = `health-badge ${ok ? "health-ok" : "health-error"}`;
+  el.healthStatus.className = `health-dot ${ok ? "health-ok" : "health-error"}`;
+  el.healthStatus.title = text;
   el.uploadButton.disabled = !ok;
   el.askButton.disabled = !ok;
 }
 
-function setRole(role) {
-  state.role = role || "custom";
-  el.userRole.textContent = state.role;
-}
-
 function login(apiKey, role) {
   state.apiKey = apiKey;
+  state.role = role || "custom";
   window.localStorage.setItem("ragDemo.apiKey", apiKey);
-  setRole(role);
-  el.loginScreen.classList.add("hidden");
-  el.appScreen.classList.remove("hidden");
-  el.appScreen.style.animation = "fadeInFast 0.3s ease-out";
+  el.userRole.textContent = state.role;
+  el.loginView.classList.add("hidden");
+  el.appView.classList.remove("hidden");
+  el.appView.style.animation = "fadeIn .3s ease-out";
   checkHealth();
   loadDocuments();
   restoreInputs();
@@ -154,20 +149,19 @@ function login(apiKey, role) {
 
 function logout() {
   state.apiKey = "";
-  state.role = "";
   window.localStorage.removeItem("ragDemo.apiKey");
-  el.appScreen.classList.add("hidden");
-  el.loginScreen.classList.remove("hidden");
-  el.loginScreen.style.animation = "fadeInFast 0.3s ease-out";
+  el.appView.classList.add("hidden");
+  el.loginView.classList.remove("hidden");
+  el.loginView.style.animation = "fadeIn .3s ease-out";
 }
 
 async function checkHealth() {
   try {
     await requestJson("/health");
     setHealth(true, "Healthy");
-  } catch (error) {
+  } catch (e) {
     setHealth(false, "Offline");
-    el.jobMeta.textContent = error.message;
+    el.jobMeta.textContent = e.message;
   }
 }
 
@@ -180,52 +174,36 @@ async function loadDemoConfig() {
 
     const savedKey = window.localStorage.getItem("ragDemo.apiKey") || "";
     if (savedKey) {
-      const matched = state.rolePresets.find((p) => p.key === savedKey);
-      if (matched) {
-        login(savedKey, matched.label);
-        return;
-      }
+      const match = state.rolePresets.find((p) => p.key === savedKey);
+      if (match) { login(savedKey, match.label); return; }
       el.manualApiKey.value = savedKey;
     }
-  } catch {
-    el.serviceLinks.textContent = "";
-  }
+  } catch { el.serviceLinks.textContent = ""; }
 }
 
 function renderRoleCards(presets) {
   el.roleCards.innerHTML = "";
   for (const { label, key } of presets) {
-    const meta = ROLE_META[label] || ROLE_META["reader"];
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "role-card";
-    card.innerHTML = `
-      <div class="role-card-icon ${meta.icon}">
-        ${label === "reader" ? "&#128218;" : label.startsWith("editor") ? "&#9997;&#65039;" : "&#128272;"}
-      </div>
-      <div class="role-card-name">${escapeHtml(label)}</div>
-      <div class="role-card-desc">${escapeHtml(meta.desc)}</div>
-    `;
-    card.addEventListener("click", () => login(key, label));
-    el.roleCards.appendChild(card);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "role-card";
+    btn.innerHTML = `<div class="role-card-name">${escapeHtml(label)}</div><div class="role-card-desc">${escapeHtml(ROLE_DESC[label] || "Query documents")}</div>`;
+    btn.addEventListener("click", () => login(key, label));
+    el.roleCards.appendChild(btn);
   }
 }
 
 function renderServiceLinks(config) {
   const obsLabel = config.otel_backend === "langfuse" ? "Langfuse" : "Logfire";
-  const links = [
-    ["Bifrost", config.bifrost_url],
-    [obsLabel, config.observability_url],
-  ].filter(([, href]) => href);
-
+  const links = [["Bifrost", config.bifrost_url], [obsLabel, config.observability_url]].filter(([, h]) => h);
   el.serviceLinks.innerHTML = "";
   for (const [label, href] of links) {
-    const link = document.createElement("a");
-    link.href = href;
-    link.target = "_blank";
-    link.rel = "noreferrer";
-    link.textContent = label;
-    el.serviceLinks.appendChild(link);
+    const a = document.createElement("a");
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+    a.textContent = label;
+    el.serviceLinks.appendChild(a);
   }
 }
 
@@ -234,7 +212,7 @@ function updateJob(job) {
   el.jobStage.textContent = job.stage ?? "-";
   el.jobProgress.textContent = `${job.progress ?? 0}%`;
   el.jobBar.value = job.progress ?? 0;
-  el.jobElapsed.textContent = state.jobStartedAt ? formatElapsed(Date.now() - state.jobStartedAt) : "-";
+  el.jobElapsed.textContent = state.jobStartedAt ? fmtElapsed(Date.now() - state.jobStartedAt) : "-";
   renderJobTimeline(job.stage, job.state);
   el.jobDetail.textContent = JOB_DETAIL[job.stage] || JOB_DETAIL[job.state] || "Working";
   el.jobDetail.classList.toggle("running", job.state === "pending" || job.state === "running");
@@ -243,40 +221,31 @@ function updateJob(job) {
 
 function startJobClock() {
   stopJobClock();
-  state.jobElapsedTimer = window.setInterval(() => {
-    if (state.jobStartedAt) {
-      el.jobElapsed.textContent = formatElapsed(Date.now() - state.jobStartedAt);
-    }
+  state.jobElapsedTimer = setInterval(() => {
+    if (state.jobStartedAt) el.jobElapsed.textContent = fmtElapsed(Date.now() - state.jobStartedAt);
   }, 1000);
 }
 
 function stopJobClock() {
-  if (state.jobElapsedTimer) {
-    window.clearInterval(state.jobElapsedTimer);
-    state.jobElapsedTimer = null;
-  }
+  if (state.jobElapsedTimer) { clearInterval(state.jobElapsedTimer); state.jobElapsedTimer = null; }
 }
 
-function renderJobTimeline(stage, stateValue) {
-  const currentIndex = Math.max(0, JOB_STAGES.findIndex(([key]) => key === stage));
+function renderJobTimeline(stage, sv) {
+  const cur = Math.max(0, JOB_STAGES.findIndex(([k]) => k === stage));
   el.jobTimeline.innerHTML = "";
   for (const [key, label] of JOB_STAGES) {
-    const index = JOB_STAGES.findIndex(([candidate]) => candidate === key);
-    const item = document.createElement("li");
-    item.textContent = label;
-    item.className = index < currentIndex || stateValue === "done" ? "done" : "";
-    if (index === currentIndex && stateValue !== "done") {
-      item.className = "active";
-    }
-    el.jobTimeline.appendChild(item);
+    const idx = JOB_STAGES.findIndex(([k]) => k === key);
+    const li = document.createElement("li");
+    li.textContent = label;
+    li.className = idx < cur || sv === "done" ? "done" : idx === cur && sv !== "done" ? "active" : "";
+    el.jobTimeline.appendChild(li);
   }
 }
 
-function formatElapsed(ms) {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
+function fmtElapsed(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(s / 60);
+  return m ? `${m}m ${s % 60}s` : `${s}s`;
 }
 
 async function pollJob(jobId) {
@@ -290,10 +259,7 @@ async function pollJob(jobId) {
       stopJobClock();
       return;
     }
-    if (job.state === "failed") {
-      stopJobClock();
-      throw new Error(job.error || "Ingestion failed");
-    }
+    if (job.state === "failed") { stopJobClock(); throw new Error(job.error || "Ingestion failed"); }
     await sleep(1400);
   }
 }
@@ -302,65 +268,46 @@ async function uploadDocument(event) {
   event.preventDefault();
   const file = el.fileInput.files?.[0];
   if (!file) return;
-
   state.currentFile = file;
   state.jobStartedAt = Date.now();
   startJobClock();
-  updateJob({
-    doc_id: el.docIdInput.value.trim() || file.name,
-    version_id: "pending",
-    state: "pending",
-    stage: "queued",
-    progress: 0,
-  });
-  loadPdf(file).catch(() => {
-    el.pdfMessage.textContent = "PDF preview could not load. Ingestion can continue.";
-  });
-
+  updateJob({ doc_id: el.docIdInput.value.trim() || file.name, version_id: "pending", state: "pending", stage: "queued", progress: 0 });
+  loadPdf(file).catch(() => { el.pdfMessage.textContent = "PDF preview could not load."; });
   const form = new FormData();
   form.append("file", file);
-  if (el.docIdInput.value.trim()) {
-    form.append("doc_id", el.docIdInput.value.trim());
-  }
-
+  if (el.docIdInput.value.trim()) form.append("doc_id", el.docIdInput.value.trim());
   el.uploadButton.disabled = true;
   try {
-    const response = await requestJson("/ingest", {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: form,
-    });
-    updateJob({ ...response, state: "pending", stage: "queued", progress: 0 });
-    await pollJob(response.job_id);
-  } catch (error) {
-    el.jobMeta.textContent = error.message;
+    const res = await requestJson("/ingest", { method: "POST", headers: getAuthHeaders(), body: form });
+    updateJob({ ...res, state: "pending", stage: "queued", progress: 0 });
+    await pollJob(res.job_id);
+  } catch (e) {
+    el.jobMeta.textContent = e.message;
     el.jobState.textContent = "Error";
     el.jobStage.textContent = "failed";
     el.jobDetail.textContent = JOB_DETAIL.failed;
     el.jobDetail.classList.remove("running");
     stopJobClock();
-  } finally {
-    el.uploadButton.disabled = false;
-  }
+  } finally { el.uploadButton.disabled = false; }
 }
 
 function renderTimings(timings) {
   el.timingOutput.innerHTML = "";
   for (const [key, value] of Object.entries(timings ?? {})) {
-    const pill = document.createElement("span");
-    pill.className = "pill";
-    pill.textContent = `${key}: ${value}ms`;
-    el.timingOutput.appendChild(pill);
+    const span = document.createElement("span");
+    span.className = "badge";
+    span.style.background = "var(--sand)";
+    span.style.color = "var(--text-2)";
+    span.style.fontFamily = "var(--font-mono)";
+    span.style.fontSize = "11px";
+    span.textContent = `${key}: ${value}ms`;
+    el.timingOutput.appendChild(span);
   }
 }
 
 function renderWarnings(warnings) {
   el.warningOutput.innerHTML = "";
-  for (const warning of warnings ?? []) {
-    const item = document.createElement("div");
-    item.textContent = warning;
-    el.warningOutput.appendChild(item);
-  }
+  for (const w of warnings ?? []) { const d = document.createElement("div"); d.textContent = w; el.warningOutput.appendChild(d); }
 }
 
 async function runQuery(event) {
@@ -378,38 +325,32 @@ async function runQuery(event) {
       top_k: Number(el.topKInput.value || 20),
       top_n: Number(el.topNInput.value || 5),
     };
-    const response = await requestJson("/api/v1/query", {
+    const res = await requestJson("/api/v1/query", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(payload),
     });
-
-    el.answerOutput.textContent = response.answer || "";
-    el.requestMeta.textContent = response.request_id ? `request ${response.request_id}` : "";
-    const cacheHit = Boolean(response.cache_hit || response.timings_ms?.cache_hit);
-    el.cacheStatus.hidden = !cacheHit;
-    el.cacheStatus.textContent = cacheHit ? "Served from cache" : "";
-    renderWarnings(response.warnings);
-    renderTimings(response.timings_ms);
-    renderCitations(response.citations || []);
-  } catch (error) {
-    el.answerOutput.textContent = error.message;
+    el.answerOutput.textContent = res.answer || "";
+    el.requestMeta.textContent = res.request_id ? `request ${res.request_id}` : "";
+    const ch = Boolean(res.cache_hit || res.timings_ms?.cache_hit);
+    el.cacheStatus.hidden = !ch;
+    renderWarnings(res.warnings);
+    renderTimings(res.timings_ms);
+    renderCitations(res.citations || []);
+    switchTab("answer");
+  } catch (e) {
+    el.answerOutput.textContent = e.message;
     el.cacheStatus.hidden = true;
-  } finally {
-    el.askButton.disabled = false;
-  }
+  } finally { el.askButton.disabled = false; }
 }
 
-function citationTitle(citation) {
-  const section = citation.section_path?.length
-    ? ` \u00b7 ${citation.section_path.join(" > ")}`
-    : "";
-  return `${citation.doc_id} \u00b7 page ${citation.page}${section}`;
+function citationTitle(c) {
+  const sec = c.section_path?.length ? ` \u00b7 ${c.section_path.join(" > ")}` : "";
+  return `${c.doc_id} \u00b7 page ${c.page}${sec}`;
 }
 
-function snippet(text, maxLength = 220) {
-  if (!text) return "";
-  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+function snippet(text, max = 200) {
+  return text?.length > max ? text.slice(0, max) + "..." : (text || "");
 }
 
 function renderCitations(citations) {
@@ -417,80 +358,57 @@ function renderCitations(citations) {
   state.selectedCitation = null;
   el.citationCount.textContent = String(citations.length);
   el.citationList.innerHTML = "";
-  el.sourceDetail.textContent = "Select a citation to inspect its lineage and chunk text.";
+  el.sourceDetail.textContent = "Select a citation to inspect its lineage.";
   el.sourceDetail.className = "source-detail empty";
   clearOverlay();
-
   if (!citations.length) {
     el.citationList.className = "citation-list empty";
     el.citationList.textContent = "No citations returned.";
     return;
   }
-
   el.citationList.className = "citation-list";
-  citations.forEach((citation, index) => {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "citation-card";
-    card.innerHTML = `
-      <div class="citation-title">${escapeHtml(citationTitle(citation))}</div>
-      <div class="citation-meta">score ${Number(citation.score || 0).toFixed(3)} \u00b7 ${escapeHtml(citation.chunk_type || "text")} \u00b7 ${escapeHtml(citation.version_id)}</div>
-      <div class="citation-snippet">${escapeHtml(snippet(citation.chunk_text))}</div>
-    `;
-    card.addEventListener("click", () => selectCitation(index));
-    el.citationList.appendChild(card);
+  citations.forEach((c, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "citation-card";
+    btn.innerHTML = `<div class="citation-title">${escapeHtml(citationTitle(c))}</div><div class="citation-meta">score ${Number(c.score || 0).toFixed(3)} \u00b7 ${escapeHtml(c.chunk_type || "text")} \u00b7 ${escapeHtml(c.version_id)}</div><div class="citation-snippet">${escapeHtml(snippet(c.chunk_text))}</div>`;
+    btn.addEventListener("click", () => selectCitation(i));
+    el.citationList.appendChild(btn);
   });
   selectCitation(0);
 }
 
-async function selectCitation(index) {
-  const citation = state.citations[index];
-  state.selectedCitation = citation;
-  for (const [i, card] of [...el.citationList.querySelectorAll(".citation-card")].entries()) {
-    card.classList.toggle("selected", i === index);
-  }
-  renderSourceDetail(citation);
-  if (citation?.page) {
-    await renderPage(citation.page, citation);
-  }
+async function selectCitation(i) {
+  const c = state.citations[i];
+  state.selectedCitation = c;
+  [...el.citationList.querySelectorAll(".citation-card")].forEach((card, j) => card.classList.toggle("selected", j === i));
+  renderSourceDetail(c);
+  if (c?.page) await renderPage(c.page, c);
 }
 
-function renderSourceDetail(citation) {
+function renderSourceDetail(c) {
   el.sourceDetail.className = "source-detail";
-  el.sourceDetail.innerHTML = `
-    <div class="detail-grid">
-      <span>Document</span><strong>${escapeHtml(citation.doc_id)}</strong>
-      <span>Version</span><strong>${escapeHtml(citation.version_id)}</strong>
-      <span>Page</span><strong>${escapeHtml(citation.page)}</strong>
-      <span>Section</span><strong>${escapeHtml((citation.section_path || []).join(" > ") || "-")}</strong>
-      <span>Type</span><strong>${escapeHtml(citation.chunk_type)}</strong>
-      <span>Score</span><strong>${Number(citation.score || 0).toFixed(3)}</strong>
-      <span>BBox</span><strong>${escapeHtml(JSON.stringify(citation.bbox || []))}</strong>
-    </div>
-    <div class="chunk-text">${escapeHtml(citation.chunk_text || "")}</div>
-  `;
+  el.sourceDetail.innerHTML = `<div class="detail-grid"><span>Document</span><strong>${escapeHtml(c.doc_id)}</strong><span>Version</span><strong>${escapeHtml(c.version_id)}</strong><span>Page</span><strong>${escapeHtml(c.page)}</strong><span>Section</span><strong>${escapeHtml((c.section_path || []).join(" > ") || "-")}</strong><span>Type</span><strong>${escapeHtml(c.chunk_type)}</strong><span>Score</span><strong>${Number(c.score || 0).toFixed(3)}</strong><span>BBox</span><strong>${escapeHtml(JSON.stringify(c.bbox || []))}</strong></div><div class="chunk-text">${escapeHtml(c.chunk_text || "")}</div>`;
 }
 
 async function copyCitation() {
   if (!state.selectedCitation) return;
   await navigator.clipboard.writeText(JSON.stringify(state.selectedCitation, null, 2));
   el.copyCitationButton.textContent = "Copied";
-  window.setTimeout(() => {
-    el.copyCitationButton.textContent = "Copy";
-  }, 1200);
+  setTimeout(() => { el.copyCitationButton.textContent = "Copy JSON"; }, 1200);
 }
 
 async function loadDocuments() {
   if (!state.apiKey) {
-    el.docsList.innerHTML = '<span class="text-muted">Sign in to see documents.</span>';
+    el.docsList.innerHTML = '<span class="text-dim">Sign in to see documents.</span>';
     el.docsList.classList.add("empty");
     return;
   }
   try {
     const docs = await requestJson("/documents", { headers: getAuthHeaders() });
     renderDocuments(docs);
-  } catch (error) {
-    el.docsList.innerHTML = `<span class="text-muted">${escapeHtml(error.message)}</span>`;
+  } catch (e) {
+    el.docsList.innerHTML = `<span class="text-dim">${escapeHtml(e.message)}</span>`;
     el.docsList.classList.add("empty");
   }
 }
@@ -498,25 +416,15 @@ async function loadDocuments() {
 function renderDocuments(docs) {
   el.docsList.innerHTML = "";
   if (!docs.length) {
-    el.docsList.className = "docs-list empty";
+    el.docsList.className = "docs-grid empty";
     el.docsList.textContent = "No documents found.";
     return;
   }
-  el.docsList.className = "docs-list";
+  el.docsList.className = "docs-grid";
   for (const doc of docs) {
     const card = document.createElement("div");
     card.className = "doc-card";
-    card.innerHTML = `
-      <div class="doc-card-header">
-        <span class="doc-card-title">${escapeHtml(doc.doc_id)}</span>
-        <div class="doc-card-actions">
-          <button type="button" class="btn btn-ghost btn-xs" data-action="select" data-doc-id="${escapeHtml(doc.doc_id)}">Select</button>
-          <button type="button" class="btn btn-danger btn-xs" data-action="soft-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Soft</button>
-          <button type="button" class="btn btn-danger btn-xs" data-action="hard-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Hard</button>
-        </div>
-      </div>
-      <div class="doc-card-meta">${doc.total_chunks} chunks \u00b7 ${escapeHtml(doc.active_version_id || "no active version")}</div>
-    `;
+    card.innerHTML = `<div class="doc-card-info"><div class="doc-card-title">${escapeHtml(doc.doc_id)}</div><div class="doc-card-meta">${doc.total_chunks} chunks \u00b7 ${escapeHtml(doc.active_version_id || "no active version")}</div></div><div class="doc-card-actions"><button type="button" class="btn btn-outline btn-2xs" data-action="select" data-doc-id="${escapeHtml(doc.doc_id)}">Select</button><button type="button" class="btn btn-danger" data-action="soft-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Soft</button><button type="button" class="btn btn-danger" data-action="hard-delete" data-doc-id="${escapeHtml(doc.doc_id)}">Hard</button></div>`;
     card.querySelectorAll("button[data-action]").forEach((btn) => {
       btn.addEventListener("click", () => handleDocAction(btn.dataset.action, btn.dataset.docId));
     });
@@ -531,205 +439,142 @@ async function handleDocAction(action, docId) {
     return;
   }
   const mode = action === "soft-delete" ? "soft" : "hard";
-  const confirmed = confirm(`${mode === "hard" ? "Permanently" : "Soft"} delete "${docId}"?`);
-  if (!confirmed) return;
+  if (!confirm(`${mode === "hard" ? "Permanently" : "Soft"} delete "${docId}"?`)) return;
   try {
-    await requestJson(`/documents/${encodeURIComponent(docId)}?mode=${mode}`, {
-      method: "DELETE",
-      headers: getAuthHeaders(),
-    });
+    await requestJson(`/documents/${encodeURIComponent(docId)}?mode=${mode}`, { method: "DELETE", headers: getAuthHeaders() });
     await loadDocuments();
-  } catch (error) {
-    alert(error.message);
-  }
+  } catch (e) { alert(e.message); }
 }
 
 async function loadPdf(file) {
-  let pdfjsLib;
-  try {
-    pdfjsLib = await getPdfJs();
-  } catch {
-    el.pdfMessage.textContent = "PDF.js did not load. Citation metadata is still available.";
+  let lib;
+  try { lib = await getPdfJs(); } catch {
+    el.pdfMessage.textContent = "PDF.js did not load.";
     return;
   }
-
   const bytes = await file.arrayBuffer();
-  state.pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
+  state.pdfDoc = await lib.getDocument({ data: bytes }).promise;
   state.pageCount = state.pdfDoc.numPages;
   state.currentPage = 1;
   await renderPage(1);
 }
 
 async function getPdfJs() {
-  pdfjsModulePromise ||= import(PDFJS_URL).then((module) => {
-    module.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
-    return module;
-  });
+  pdfjsModulePromise ||= import(PDFJS_URL).then((m) => { m.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL; return m; });
   return pdfjsModulePromise;
 }
 
 async function renderPage(pageNumber, citation = state.selectedCitation) {
   if (!state.pdfDoc) {
-    el.pdfMessage.textContent = "Upload a PDF in this browser session to enable source preview.";
+    el.pdfMessage.textContent = "Upload a PDF to preview it here.";
     el.pdfViewport.hidden = true;
     return;
   }
-
-  const boundedPage = Math.min(Math.max(Number(pageNumber) || 1, 1), state.pageCount);
-  state.currentPage = boundedPage;
-  const page = await state.pdfDoc.getPage(boundedPage);
-  const containerWidth = el.pdfViewport.parentElement.clientWidth - 30;
-  const naturalViewport = page.getViewport({ scale: 1 });
-  const scale = Math.min(1.6, Math.max(0.7, containerWidth / naturalViewport.width));
-  const viewport = page.getViewport({ scale });
-  const context = el.pdfCanvas.getContext("2d");
-
-  el.pdfCanvas.width = Math.floor(viewport.width);
-  el.pdfCanvas.height = Math.floor(viewport.height);
-  el.pdfCanvas.style.width = `${Math.floor(viewport.width)}px`;
-  el.pdfCanvas.style.height = `${Math.floor(viewport.height)}px`;
-  el.overlayLayer.setAttribute("width", String(Math.floor(viewport.width)));
-  el.overlayLayer.setAttribute("height", String(Math.floor(viewport.height)));
-  el.overlayLayer.style.width = `${Math.floor(viewport.width)}px`;
-  el.overlayLayer.style.height = `${Math.floor(viewport.height)}px`;
-
+  const pg = Math.min(Math.max(Number(pageNumber) || 1, 1), state.pageCount);
+  state.currentPage = pg;
+  const page = await state.pdfDoc.getPage(pg);
+  const cw = el.pdfViewport.parentElement.clientWidth - 24;
+  const nv = page.getViewport({ scale: 1 });
+  const scale = Math.min(1.6, Math.max(0.7, cw / nv.width));
+  const vp = page.getViewport({ scale });
+  const ctx = el.pdfCanvas.getContext("2d");
+  el.pdfCanvas.width = Math.floor(vp.width);
+  el.pdfCanvas.height = Math.floor(vp.height);
+  el.pdfCanvas.style.width = `${Math.floor(vp.width)}px`;
+  el.pdfCanvas.style.height = `${Math.floor(vp.height)}px`;
+  el.overlayLayer.setAttribute("width", String(Math.floor(vp.width)));
+  el.overlayLayer.setAttribute("height", String(Math.floor(vp.height)));
+  el.overlayLayer.style.width = `${Math.floor(vp.width)}px`;
+  el.overlayLayer.style.height = `${Math.floor(vp.height)}px`;
   el.pdfViewport.hidden = false;
   el.pdfMessage.textContent = "";
-  el.pageIndicator.textContent = `${boundedPage} / ${state.pageCount}`;
-  el.prevPageButton.disabled = boundedPage <= 1;
-  el.nextPageButton.disabled = boundedPage >= state.pageCount;
-
-  await page.render({ canvasContext: context, viewport }).promise;
-  drawOverlay(citation, {
-    renderedWidth: viewport.width,
-    renderedHeight: viewport.height,
-    pdfPointWidth: naturalViewport.width,
-    pdfPointHeight: naturalViewport.height,
-  });
+  el.pageIndicator.textContent = `${pg} / ${state.pageCount}`;
+  el.prevPageButton.disabled = pg <= 1;
+  el.nextPageButton.disabled = pg >= state.pageCount;
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  drawOverlay(citation, { renderedWidth: vp.width, renderedHeight: vp.height, pdfPointWidth: nv.width, pdfPointHeight: nv.height });
 }
 
-function clearOverlay() {
-  el.overlayLayer.innerHTML = "";
-}
+function clearOverlay() { el.overlayLayer.innerHTML = ""; }
 
-function drawOverlay(citation, pageMetrics) {
+function drawOverlay(citation, pm) {
   clearOverlay();
   const bbox = citation?.bbox || [];
-  if (Number(citation?.page) !== state.currentPage) {
-    return;
-  }
-
-  if (!bbox.length) {
-    el.pdfMessage.textContent = "Selected citation has no bbox. Re-ingest this PDF to generate overlay-ready citations.";
-    return;
-  }
-
-  const normalizedBbox = normalizeOverlayBbox(bbox, pageMetrics);
-  if (!normalizedBbox.length) {
-    el.pdfMessage.textContent = "Selected citation has bbox data that cannot be mapped to this PDF page.";
-    return;
-  }
+  if (Number(citation?.page) !== state.currentPage) return;
+  if (!bbox.length) { el.pdfMessage.textContent = "No bbox for this citation."; return; }
+  const norm = normalizeBbox(bbox, pm);
+  if (!norm.length) { el.pdfMessage.textContent = "Bbox cannot be mapped to page."; return; }
   el.pdfMessage.textContent = "";
-
-  if (normalizedBbox.length === 4) {
-    const [x0, y0, x1, y1] = normalizedBbox;
-    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("x", String(x0 * pageMetrics.renderedWidth));
-    rect.setAttribute("y", String(y0 * pageMetrics.renderedHeight));
-    rect.setAttribute("width", String(Math.max(2, (x1 - x0) * pageMetrics.renderedWidth)));
-    rect.setAttribute("height", String(Math.max(2, (y1 - y0) * pageMetrics.renderedHeight)));
-    rect.setAttribute("fill", "rgba(59, 130, 246, 0.18)");
-    rect.setAttribute("stroke", "#3b82f6");
-    rect.setAttribute("stroke-width", "2");
-    el.overlayLayer.appendChild(rect);
+  if (norm.length === 4) {
+    const [x0, y0, x1, y1] = norm;
+    const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    r.setAttribute("x", String(x0 * pm.renderedWidth));
+    r.setAttribute("y", String(y0 * pm.renderedHeight));
+    r.setAttribute("width", String(Math.max(2, (x1 - x0) * pm.renderedWidth)));
+    r.setAttribute("height", String(Math.max(2, (y1 - y0) * pm.renderedHeight)));
+    r.setAttribute("fill", "rgba(194, 65, 12, 0.15)");
+    r.setAttribute("stroke", "#c2410c");
+    r.setAttribute("stroke-width", "2");
+    el.overlayLayer.appendChild(r);
     return;
   }
-
-  if (normalizedBbox.length >= 8 && normalizedBbox.length % 2 === 0) {
-    const points = [];
-    for (let i = 0; i < normalizedBbox.length; i += 2) {
-      points.push(
-        `${normalizedBbox[i] * pageMetrics.renderedWidth},${normalizedBbox[i + 1] * pageMetrics.renderedHeight}`,
-      );
-    }
-    const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-    polygon.setAttribute("points", points.join(" "));
-    polygon.setAttribute("fill", "rgba(59, 130, 246, 0.18)");
-    polygon.setAttribute("stroke", "#3b82f6");
-    polygon.setAttribute("stroke-width", "2");
-    el.overlayLayer.appendChild(polygon);
+  if (norm.length >= 8 && norm.length % 2 === 0) {
+    const pts = [];
+    for (let i = 0; i < norm.length; i += 2) pts.push(`${norm[i] * pm.renderedWidth},${norm[i + 1] * pm.renderedHeight}`);
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    p.setAttribute("points", pts.join(" "));
+    p.setAttribute("fill", "rgba(194, 65, 12, 0.15)");
+    p.setAttribute("stroke", "#c2410c");
+    p.setAttribute("stroke-width", "2");
+    el.overlayLayer.appendChild(p);
   }
 }
 
-function normalizeOverlayBbox(bbox, pageMetrics) {
-  const values = bbox.map(Number);
-  if (!values.every(Number.isFinite)) {
-    return [];
+function normalizeBbox(bbox, pm) {
+  const vals = bbox.map(Number);
+  if (!vals.every(Number.isFinite)) return [];
+  const mx = Math.max(...vals);
+  if (mx <= 1.05) return vals.map(clamp);
+  const pi = { width: pm.pdfPointWidth / 72, height: pm.pdfPointHeight / 72 };
+  const inches = mx <= Math.max(pi.width, pi.height) * 1.2;
+  const basis = inches ? pi : { width: pm.pdfPointWidth, height: pm.pdfPointHeight };
+  if (vals.length === 4) {
+    const [x0, y0, x1, y1] = vals;
+    return [clamp(Math.min(x0, x1) / basis.width), clamp(Math.min(y0, y1) / basis.height), clamp(Math.max(x0, x1) / basis.width), clamp(Math.max(y0, y1) / basis.height)];
   }
-
-  const maxValue = Math.max(...values);
-  if (maxValue <= 1.05) {
-    return values.map(clampUnit);
+  if (vals.length >= 8 && vals.length % 2 === 0) {
+    const out = [];
+    for (let i = 0; i < vals.length; i += 2) { out.push(clamp(vals[i] / basis.width)); out.push(clamp(vals[i + 1] / basis.height)); }
+    return out;
   }
-
-  const pageInches = {
-    width: pageMetrics.pdfPointWidth / 72,
-    height: pageMetrics.pdfPointHeight / 72,
-  };
-  const looksLikeInches =
-    maxValue <= Math.max(pageInches.width, pageInches.height) * 1.2;
-  const basis = looksLikeInches
-    ? pageInches
-    : { width: pageMetrics.pdfPointWidth, height: pageMetrics.pdfPointHeight };
-
-  if (values.length === 4) {
-    const [x0, y0, x1, y1] = values;
-    return [
-      clampUnit(Math.min(x0, x1) / basis.width),
-      clampUnit(Math.min(y0, y1) / basis.height),
-      clampUnit(Math.max(x0, x1) / basis.width),
-      clampUnit(Math.max(y0, y1) / basis.height),
-    ];
-  }
-
-  if (values.length >= 8 && values.length % 2 === 0) {
-    const normalized = [];
-    for (let i = 0; i < values.length; i += 2) {
-      normalized.push(clampUnit(values[i] / basis.width));
-      normalized.push(clampUnit(values[i + 1] / basis.height));
-    }
-    return normalized;
-  }
-
   return [];
 }
 
-function clampUnit(value) {
-  return Math.min(1, Math.max(0, value));
-}
+function clamp(v) { return Math.min(1, Math.max(0, v)); }
 
-async function changePage(delta) {
-  await renderPage(state.currentPage + delta);
-}
+async function changePage(d) { await renderPage(state.currentPage + d); }
 
 function restoreInputs() {
   el.queryDocIds.value = window.localStorage.getItem("ragDemo.docId") || "";
   el.queryVersionIds.value = "";
 }
 
+function switchTab(name) {
+  $$(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
+  $$(".pane").forEach((p) => p.classList.toggle("active", p.id === `pane${name.charAt(0).toUpperCase() + name.slice(1)}`));
+}
+
+function autoResizeTextarea() {
+  const ta = el.queryInput;
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight, 80) + "px";
+}
+
 function setupDropZone() {
   const zone = el.dropZone;
   if (!zone) return;
-
-  zone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    zone.classList.add("drag-over");
-  });
-
-  zone.addEventListener("dragleave", () => {
-    zone.classList.remove("drag-over");
-  });
-
+  zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag-over"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
   zone.addEventListener("drop", (e) => {
     e.preventDefault();
     zone.classList.remove("drag-over");
@@ -752,25 +597,25 @@ el.manualLoginForm.addEventListener("submit", (e) => {
 });
 
 el.logoutButton.addEventListener("click", logout);
+el.openIngest.addEventListener("click", () => el.ingestOverlay.classList.remove("hidden"));
+el.closeIngest.addEventListener("click", () => el.ingestOverlay.classList.add("hidden"));
+el.ingestBackdrop.addEventListener("click", () => el.ingestOverlay.classList.add("hidden"));
 
-el.uploadForm.addEventListener("submit", async (event) => {
-  await uploadDocument(event);
-  loadDocuments();
-});
-
+el.uploadForm.addEventListener("submit", async (e) => { await uploadDocument(e); loadDocuments(); });
 el.queryForm.addEventListener("submit", runQuery);
 el.copyCitationButton.addEventListener("click", copyCitation);
 el.prevPageButton.addEventListener("click", () => changePage(-1));
 el.nextPageButton.addEventListener("click", () => changePage(1));
 el.refreshDocsButton.addEventListener("click", loadDocuments);
-
 el.fileInput.addEventListener("change", async () => {
-  const file = el.fileInput.files?.[0];
-  if (file) {
-    el.fileName.textContent = file.name;
-    state.currentFile = file;
-    await loadPdf(file);
-  }
+  const f = el.fileInput.files?.[0];
+  if (f) { el.fileName.textContent = f.name; state.currentFile = f; await loadPdf(f); }
+});
+
+el.queryInput.addEventListener("input", autoResizeTextarea);
+
+$$(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => switchTab(tab.dataset.tab));
 });
 
 setupDropZone();

@@ -7,232 +7,209 @@
   <title>LineageRAG</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/demo/styles.css" />
 </head>
 
 <body>
-  <div id="loginScreen" class="login-screen">
-    <div class="login-bg-grid"></div>
-    <div class="login-container fade-in">
-      <div class="login-brand">
-        <div class="login-logo">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <rect width="40" height="40" rx="10" fill="url(#logo-grad)" />
-            <path d="M12 14h16M12 20h16M12 26h10" stroke="#fff" stroke-width="2.5" stroke-linecap="round" />
-            <circle cx="28" cy="26" r="4" fill="#60a5fa" stroke="#fff" stroke-width="1.5" />
-            <defs>
-              <linearGradient id="logo-grad" x1="0" y1="0" x2="40" y2="40">
-                <stop stop-color="#3b82f6" />
-                <stop offset="1" stop-color="#6366f1" />
-              </linearGradient>
-            </defs>
-          </svg>
+  <div id="loginView" class="login-view">
+    <div class="login-left">
+      <div class="login-left-content">
+        <div class="login-eyebrow">RAG Hackathon 2026</div>
+        <h1 class="login-headline">Trace every answer<br /><em>back to the source.</em></h1>
+        <p class="login-body">Upload documents. Ask questions. Every response comes with full lineage &mdash; page number, section path, bounding box, and the exact chunk text that grounded the answer.</p>
+        <div class="login-features">
+          <div class="login-feature">
+            <span class="feat-num">01</span>
+            <span class="feat-text">Hybrid dense + sparse retrieval</span>
+          </div>
+          <div class="login-feature">
+            <span class="feat-num">02</span>
+            <span class="feat-text">Cohere reranking with RRF fusion</span>
+          </div>
+          <div class="login-feature">
+            <span class="feat-num">03</span>
+            <span class="feat-text">Full citation lineage per answer</span>
+          </div>
         </div>
-        <h1 class="login-title">LineageRAG</h1>
-        <p class="login-subtitle">Trace every answer back to the source</p>
       </div>
+    </div>
 
-      <div class="login-section-label">Sign in with a role</div>
-      <div id="roleCards" class="role-cards"></div>
+    <div class="login-right">
+      <div class="login-form-wrap">
+        <h2 class="login-form-title">Sign in</h2>
+        <p class="login-form-sub">Choose a role to explore the system</p>
 
-      <div class="login-divider"><span>or enter API key manually</span></div>
+        <div id="roleCards" class="role-cards"></div>
 
-      <form id="manualLoginForm" class="manual-login-form">
-        <div class="input-group">
-          <input id="manualApiKey" type="password" placeholder=" " autocomplete="off" required />
-          <label>API Key</label>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Sign In</button>
-      </form>
+        <div class="login-or"><span>or use an API key</span></div>
+
+        <form id="manualLoginForm" class="login-manual">
+          <div class="field">
+            <input id="manualApiKey" type="password" placeholder=" " autocomplete="off" required />
+            <label for="manualApiKey">API Key</label>
+          </div>
+          <button type="submit" class="btn btn-accent btn-full">Continue</button>
+        </form>
+      </div>
     </div>
   </div>
 
-  <div id="appScreen" class="app-screen hidden">
+  <div id="appView" class="app-view hidden">
     <header class="topbar">
-      <div class="topbar-left">
-        <div class="topbar-logo">
-          <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
-            <rect width="40" height="40" rx="10" fill="url(#logo-grad2)" />
-            <path d="M12 14h16M12 20h16M12 26h10" stroke="#fff" stroke-width="2.5" stroke-linecap="round" />
-            <circle cx="28" cy="26" r="4" fill="#60a5fa" stroke="#fff" stroke-width="1.5" />
-            <defs>
-              <linearGradient id="logo-grad2" x1="0" y1="0" x2="40" y2="40">
-                <stop stop-color="#3b82f6" />
-                <stop offset="1" stop-color="#6366f1" />
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-        <div>
-          <h1 class="topbar-title">LineageRAG</h1>
-        </div>
+      <div class="topbar-brand">
+        <span class="brand-mark">L</span>
+        <span class="brand-name">LineageRAG</span>
       </div>
-      <div class="topbar-right">
-        <nav id="serviceLinks" class="service-links" aria-label="Service links"></nav>
-        <div id="healthStatus" class="health-badge health-checking">Checking</div>
-        <div class="user-menu">
-          <div id="userBadge" class="user-badge">
-            <span class="user-role" id="userRole">-</span>
-          </div>
-          <button id="logoutButton" type="button" class="btn btn-ghost btn-xs" title="Sign out">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 14H3a1 1 0 01-1-1V3a1 1 0 011-1h3M11 11l3-3-3-3M14 8H6"/></svg>
-          </button>
+
+      <div class="topbar-center">
+        <form id="queryForm" class="command-bar">
+          <svg class="command-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7.5" cy="7.5" r="5"/><path d="M11 11l4.5 4.5"/></svg>
+          <textarea id="queryInput" rows="1" placeholder="Ask a question about your documents..." required></textarea>
+          <button id="askButton" type="submit" class="btn btn-accent btn-sm">Ask</button>
+        </form>
+      </div>
+
+      <div class="topbar-actions">
+        <nav id="serviceLinks" class="svc-links" aria-label="Services"></nav>
+        <div id="healthStatus" class="health-dot health-checking" title="Checking..."></div>
+        <div class="user-pill">
+          <span id="userRole" class="user-role-label">reader</span>
+          <button id="logoutButton" type="button" class="btn btn-text btn-2xs" title="Sign out">Sign out</button>
         </div>
       </div>
     </header>
 
-    <main class="layout">
-      <aside class="sidebar">
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h8"/></svg>
-              Upload
-            </h2>
-          </div>
-          <form id="uploadForm" class="stack">
-            <div class="drop-zone" id="dropZone">
-              <input id="fileInput" type="file" accept="application/pdf" required class="file-input-hidden" />
-              <div class="drop-zone-content">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M16 20V6M10 12l6-6 6 6M26 22v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4"/></svg>
-                <span class="drop-zone-text">Drop PDF here or <strong>browse</strong></span>
-                <span id="fileName" class="file-name"></span>
-              </div>
-            </div>
-            <div class="input-group">
-              <input id="docIdInput" type="text" placeholder=" " />
-              <label>Document ID (optional)</label>
-            </div>
-            <button id="uploadButton" type="submit" class="btn btn-primary btn-block">Upload</button>
-          </form>
-        </section>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button id="tabAnswer" type="button" class="tab active" data-tab="answer">Answer</button>
+        <button id="tabSources" type="button" class="tab" data-tab="sources">Sources</button>
+        <button id="tabDocuments" type="button" class="tab" data-tab="documents">Documents</button>
+      </div>
+      <div class="toolbar-right">
+        <button id="openIngest" type="button" class="btn btn-outline btn-sm">Upload PDF</button>
+      </div>
+    </div>
 
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M6 2v12M2 6h12"/></svg>
-              Documents
-            </h2>
-            <button id="refreshDocsButton" type="button" class="btn btn-ghost btn-xs">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 2v4h-4M2 14v-4h4"/><path d="M13.5 6A6 6 0 003.1 4.7L2 6M2.5 10a6 6 0 0010.4 1.3L14 10"/></svg>
-            </button>
+    <main class="content">
+      <section id="paneAnswer" class="pane active">
+        <div class="answer-header">
+          <h2 class="pane-heading">Answer</h2>
+          <div class="answer-badges">
+            <span id="cacheStatus" class="badge badge-green" hidden>Cache</span>
+            <span id="requestMeta" class="text-dim text-xs"></span>
           </div>
-          <div id="docsList" class="docs-list empty">Sign in to see documents.</div>
-        </section>
+        </div>
+        <div id="answerOutput" class="answer-body empty">Ask a question in the command bar above to get a grounded answer.</div>
+        <div id="warningOutput" class="warnings"></div>
+        <div id="timingOutput" class="timings"></div>
 
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
-              Ingestion
-            </h2>
+        <div class="citations-section">
+          <div class="citations-header">
+            <h3 class="pane-heading">Citations <span id="citationCount" class="count-badge">0</span></h3>
           </div>
-          <div class="job-grid">
-            <span>State</span><strong id="jobState">Idle</strong>
-            <span>Stage</span><strong id="jobStage">-</strong>
-            <span>Progress</span><strong id="jobProgress">0%</strong>
-            <span>Elapsed</span><strong id="jobElapsed">-</strong>
-          </div>
-          <progress id="jobBar" max="100" value="0"></progress>
-          <p id="jobDetail" class="job-detail">Waiting for an upload.</p>
-          <ol id="jobTimeline" class="job-timeline" aria-label="Ingestion stages"></ol>
-          <p id="jobMeta" class="text-muted text-sm">No active ingestion job.</p>
-        </section>
+          <div id="citationList" class="citation-list empty">Citations will appear after you ask a question.</div>
+        </div>
 
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
-              Query
-            </h2>
+        <div class="detail-section">
+          <div class="detail-header">
+            <h3 class="pane-heading">Source detail</h3>
+            <button id="copyCitationButton" type="button" class="btn btn-text btn-2xs">Copy JSON</button>
           </div>
-          <form id="queryForm" class="stack">
-            <div class="input-group">
-              <textarea id="queryInput" rows="4" placeholder=" " required></textarea>
-              <label>Ask a question</label>
-            </div>
-            <div class="input-row">
-              <div class="input-group input-sm">
-                <input id="queryDocIds" type="text" placeholder=" " />
-                <label>Doc IDs</label>
-              </div>
-              <div class="input-group input-sm">
-                <input id="queryVersionIds" type="text" placeholder=" " />
-                <label>Version IDs</label>
-              </div>
-            </div>
-            <div class="input-row">
-              <div class="input-group input-xs">
-                <input id="topKInput" type="number" min="1" max="100" value="20" placeholder=" " />
-                <label>Top K</label>
-              </div>
-              <div class="input-group input-xs">
-                <input id="topNInput" type="number" min="1" max="20" value="5" placeholder=" " />
-                <label>Top N</label>
-              </div>
-            </div>
-            <button id="askButton" type="submit" class="btn btn-accent btn-block">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 8a6 6 0 11-12 0 6 6 0 0112 0zM8 5v3M8 10.5v.5"/></svg>
-              Ask
-            </button>
-          </form>
-        </section>
-      </aside>
+          <div id="sourceDetail" class="source-detail empty">Select a citation to inspect its lineage.</div>
+        </div>
+      </section>
 
-      <section class="workspace">
-        <section class="panel answer-panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Answer</h2>
-            <div class="answer-meta">
-              <span id="cacheStatus" class="cache-badge" hidden>Cache hit</span>
-              <span id="requestMeta" class="text-muted text-sm"></span>
-            </div>
-          </div>
-          <div id="answerOutput" class="answer empty">Ask a question to see the grounded answer.</div>
-          <div id="warningOutput" class="warnings"></div>
-          <div id="timingOutput" class="timings"></div>
-        </section>
-
-        <section class="source-grid">
-          <section class="panel pdf-panel">
-            <div class="panel-header">
-              <h2 class="panel-title">PDF Source</h2>
-              <div class="pdf-controls">
-                <button id="prevPageButton" type="button" class="btn btn-ghost btn-xs" aria-label="Previous page">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 12L6 8l4-4"/></svg>
-                </button>
-                <span id="pageIndicator" class="page-indicator">- / -</span>
-                <button id="nextPageButton" type="button" class="btn btn-ghost btn-xs" aria-label="Next page">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 4l4 4-4 4"/></svg>
-                </button>
+      <section id="paneSources" class="pane">
+        <div class="sources-layout">
+          <div class="pdf-col">
+            <div class="pdf-toolbar">
+              <h3 class="pane-heading">PDF Preview</h3>
+              <div class="pdf-nav">
+                <button id="prevPageButton" type="button" class="btn btn-text btn-2xs" aria-label="Previous page">&larr;</button>
+                <span id="pageIndicator" class="text-dim text-xs mono">- / -</span>
+                <button id="nextPageButton" type="button" class="btn btn-text btn-2xs" aria-label="Next page">&rarr;</button>
               </div>
             </div>
-            <div id="pdfMessage" class="text-muted text-sm">Upload a PDF to enable source preview.</div>
+            <div id="pdfMessage" class="text-dim text-sm">Upload a PDF to preview it here.</div>
             <div id="pdfViewport" class="pdf-viewport" hidden>
               <canvas id="pdfCanvas"></canvas>
               <svg id="overlayLayer" class="overlay-layer" aria-hidden="true"></svg>
             </div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-header">
-              <h2 class="panel-title">Citations</h2>
-              <span id="citationCount" class="text-muted text-sm">0</span>
-            </div>
-            <div id="citationList" class="citation-list empty">Citations will appear here.</div>
-          </section>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Source Detail</h2>
-            <button id="copyCitationButton" type="button" class="btn btn-ghost btn-xs">Copy</button>
           </div>
-          <div id="sourceDetail" class="source-detail empty">Select a citation to inspect its lineage and chunk text.</div>
-        </section>
+        </div>
+      </section>
+
+      <section id="paneDocuments" class="pane">
+        <div class="docs-header">
+          <h2 class="pane-heading">Documents</h2>
+          <button id="refreshDocsButton" type="button" class="btn btn-text btn-2xs">Refresh</button>
+        </div>
+        <div id="docsList" class="docs-grid empty">Sign in to see documents.</div>
       </section>
     </main>
+
+    <div id="ingestOverlay" class="overlay hidden">
+      <div class="overlay-backdrop" id="ingestBackdrop"></div>
+      <aside class="overlay-panel">
+        <div class="overlay-header">
+          <h2 class="pane-heading">Upload document</h2>
+          <button id="closeIngest" type="button" class="btn btn-text btn-2xs">&times;</button>
+        </div>
+
+        <form id="uploadForm" class="upload-form">
+          <div class="drop-area" id="dropZone">
+            <input id="fileInput" type="file" accept="application/pdf" required class="sr-only" />
+            <div class="drop-inner">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 18V6M9 10l5-5 5 5M24 18v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5"/></svg>
+              <span class="drop-label">Drop a PDF or <strong>click to browse</strong></span>
+              <span id="fileName" class="file-label"></span>
+            </div>
+          </div>
+          <div class="field">
+            <input id="docIdInput" type="text" placeholder=" " />
+            <label for="docIdInput">Document ID (optional)</label>
+          </div>
+          <button id="uploadButton" type="submit" class="btn btn-accent btn-full">Start ingestion</button>
+        </form>
+
+        <div class="job-section">
+          <h3 class="pane-heading">Job status</h3>
+          <div class="job-grid">
+            <span class="text-dim">State</span><strong id="jobState">Idle</strong>
+            <span class="text-dim">Stage</span><strong id="jobStage">-</strong>
+            <span class="text-dim">Progress</span><strong id="jobProgress">0%</strong>
+            <span class="text-dim">Elapsed</span><strong id="jobElapsed">-</strong>
+          </div>
+          <progress id="jobBar" max="100" value="0"></progress>
+          <p id="jobDetail" class="job-detail">No active job.</p>
+          <ol id="jobTimeline" class="job-timeline" aria-label="Ingestion stages"></ol>
+          <p id="jobMeta" class="text-dim text-xs">Waiting for upload.</p>
+        </div>
+
+        <div class="query-opts-section">
+          <h3 class="pane-heading">Query options</h3>
+          <div class="opts-grid">
+            <div class="field field-sm">
+              <input id="queryDocIds" type="text" placeholder=" " />
+              <label for="queryDocIds">Doc IDs</label>
+            </div>
+            <div class="field field-sm">
+              <input id="queryVersionIds" type="text" placeholder=" " />
+              <label for="queryVersionIds">Version IDs</label>
+            </div>
+            <div class="field field-xs">
+              <input id="topKInput" type="number" min="1" max="100" value="20" placeholder=" " />
+              <label for="topKInput">Top K</label>
+            </div>
+            <div class="field field-xs">
+              <input id="topNInput" type="number" min="1" max="20" value="5" placeholder=" " />
+              <label for="topNInput">Top N</label>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
   </div>
 
   <script src="/static/demo/app.js" type="module"></script>
