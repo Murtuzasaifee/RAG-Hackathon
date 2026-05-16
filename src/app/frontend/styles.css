@@ -448,6 +448,11 @@ body {
 
 .command-bar textarea::placeholder { color: var(--text-3); }
 
+.command-bar.disabled {
+  opacity: .45;
+  pointer-events: none;
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;
@@ -553,7 +558,7 @@ body {
 
 .content {
   padding: 24px;
-  max-width: 1100px;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
 }
@@ -576,27 +581,61 @@ body {
   gap: 8px;
 }
 
-/* ── ANSWER ── */
+/* ── ANSWER LAYOUT (split) ── */
 
-.answer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+.answer-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
 }
 
-.answer-badges {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.answer-col {
+  display: grid;
+  gap: 16px;
 }
 
-.answer-body {
+.answer-card {
   background: var(--white);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  padding: 24px;
-  min-height: 100px;
+  overflow: hidden;
+}
+
+.answer-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px 0;
+}
+
+.answer-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.answer-card-title {
+  font: 600 15px/1.3 var(--font-body);
+  color: var(--text);
+}
+
+.answer-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.answer-body {
+  padding: 16px 20px 20px;
+  min-height: 80px;
   font-size: 15px;
   line-height: 1.75;
   white-space: pre-wrap;
@@ -605,11 +644,12 @@ body {
 .answer-body.empty {
   color: var(--text-3);
   font-style: italic;
+  padding: 24px 20px 28px;
 }
 
 .warnings {
   color: var(--red);
-  margin-top: 10px;
+  padding: 0 20px 12px;
   font-size: 13px;
 }
 
@@ -617,7 +657,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  padding: 0 20px 16px;
 }
 
 .badge {
@@ -632,43 +672,55 @@ body {
   color: var(--green);
 }
 
-.count-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--sand);
-  font: 600 11px/1 var(--font-mono);
-  color: var(--text-2);
-  padding: 0 6px;
-}
+/* ── CITATIONS CARD ── */
 
-/* ── CITATIONS ── */
-
-.citations-section {
-  margin-top: 32px;
+.citations-card {
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .citations-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.citations-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--sand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.citations-title {
+  font: 600 13px/1.3 var(--font-body);
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .citation-list {
   display: grid;
-  gap: 8px;
-  max-height: 420px;
+  gap: 0;
+  max-height: 320px;
   overflow-y: auto;
-  padding-right: 4px;
 }
 
 .citation-list.empty {
   color: var(--text-3);
   font-style: italic;
   font-size: 13px;
+  padding: 20px;
 }
 
 .citation-list::-webkit-scrollbar { width: 3px; }
@@ -676,58 +728,70 @@ body {
 
 .citation-card {
   width: 100%;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  background: var(--white);
+  border: none;
+  border-bottom: 1px solid var(--border-light);
+  background: none;
   text-align: left;
-  padding: 14px 16px;
+  padding: 12px 20px;
   cursor: pointer;
-  transition: all .15s;
+  transition: background .12s;
   font: inherit;
   color: inherit;
 }
 
+.citation-card:last-child { border-bottom: none; }
+
 .citation-card:hover {
-  border-color: var(--accent);
-  background: var(--accent-faint);
+  background: var(--cream);
 }
 
 .citation-card.selected {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  background: var(--accent-faint);
+  border-left: 3px solid var(--accent);
+  padding-left: 17px;
 }
 
 .citation-title {
   font: 600 13px/1.3 var(--font-body);
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .citation-meta {
   font: 400 11px/1.4 var(--font-mono);
   color: var(--text-3);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .citation-snippet {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
-  color: var(--text-2);
+  color: var(--text-3);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* ── SOURCE DETAIL ── */
+/* ── DETAIL CARD ── */
 
-.detail-section {
-  margin-top: 28px;
+.detail-card {
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.detail-title {
+  font: 600 13px/1.3 var(--font-body);
+  color: var(--text-2);
 }
 
 .source-detail {
@@ -739,51 +803,94 @@ body {
   color: var(--text-3);
   font-style: italic;
   font-size: 13px;
+  padding: 20px;
 }
 
 .detail-grid {
   display: grid;
-  grid-template-columns: 100px 1fr;
-  gap: 3px 12px;
-  font-size: 13px;
+  grid-template-columns: 90px 1fr;
+  gap: 2px 12px;
+  font-size: 12px;
+  padding: 12px 20px 0;
 }
 
 .detail-grid span { color: var(--text-3); }
 .detail-grid strong { font-weight: 500; word-break: break-all; }
 
 .chunk-text {
-  max-height: 220px;
+  max-height: 180px;
   overflow: auto;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
+  border-top: 1px solid var(--border-light);
   background: var(--cream);
-  padding: 14px;
+  padding: 14px 20px;
   white-space: pre-wrap;
-  font: 400 13px/1.65 var(--font-mono);
+  font: 400 12px/1.65 var(--font-mono);
   color: var(--text-2);
 }
 
-/* ── SOURCES TAB (PDF) ── */
+/* ── PDF COL ── */
 
-.pdf-toolbar {
+.pdf-col {
+  position: sticky;
+  top: 110px;
+}
+
+.pdf-card {
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.pdf-card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.pdf-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--sand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.pdf-card-title {
+  font: 600 13px/1.3 var(--font-body);
+  color: var(--text-2);
+  flex: 1;
 }
 
 .pdf-nav {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.pdf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  color: var(--text-3);
+  font-size: 13px;
+  text-align: center;
 }
 
 .pdf-viewport {
   position: relative;
   overflow: auto;
-  max-height: 700px;
-  border-radius: var(--radius);
-  background: #1a1714;
+  max-height: calc(100vh - 200px);
+  background: #2a2520;
   padding: 12px;
 }
 
@@ -1044,6 +1151,21 @@ progress::-moz-progress-bar { background: var(--accent); }
   gap: 8px;
 }
 
+/* ── COUNT BADGE ── */
+
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--sand);
+  font: 600 11px/1 var(--font-mono);
+  color: var(--text-2);
+  padding: 0 6px;
+}
+
 /* ── SCROLLBAR ── */
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -1062,6 +1184,9 @@ progress::-moz-progress-bar { background: var(--accent); }
   .topbar { flex-wrap: wrap; padding: 10px 16px; gap: 10px; }
   .topbar-center { order: 3; max-width: 100%; width: 100%; }
   .topbar-actions { width: auto; }
+
+  .answer-layout { grid-template-columns: 1fr; }
+  .pdf-col { position: static; }
 
   .overlay-panel { width: 100%; }
 }

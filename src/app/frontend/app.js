@@ -133,7 +133,7 @@ function setHealth(ok, text) {
   el.askButton.disabled = !ok;
 }
 
-function login(apiKey, role) {
+async function login(apiKey, role) {
   state.apiKey = apiKey;
   state.role = role || "custom";
   window.localStorage.setItem("ragDemo.apiKey", apiKey);
@@ -142,9 +142,13 @@ function login(apiKey, role) {
   el.appView.classList.remove("hidden");
   el.appView.style.animation = "fadeIn .3s ease-out";
   checkHealth();
-  loadDocuments();
-  restoreInputs();
   renderJobTimeline("queued", "idle");
+  restoreInputs();
+  const docs = await loadDocuments();
+  if (!docs || !docs.length) {
+    setQueryEnabled(false);
+    el.ingestOverlay.classList.remove("hidden");
+  }
 }
 
 function logout() {
@@ -171,7 +175,6 @@ async function loadDemoConfig() {
     renderServiceLinks(config);
     state.rolePresets = config.role_presets || [];
     renderRoleCards(state.rolePresets);
-
     const savedKey = window.localStorage.getItem("ragDemo.apiKey") || "";
     if (savedKey) el.manualApiKey.value = savedKey;
   } catch { el.serviceLinks.textContent = ""; }
@@ -277,6 +280,8 @@ async function uploadDocument(event) {
     const res = await requestJson("/ingest", { method: "POST", headers: getAuthHeaders(), body: form });
     updateJob({ ...res, state: "pending", stage: "queued", progress: 0 });
     await pollJob(res.job_id);
+    setQueryEnabled(true);
+    el.ingestOverlay.classList.add("hidden");
   } catch (e) {
     el.jobMeta.textContent = e.message;
     el.jobState.textContent = "Error";
@@ -333,7 +338,6 @@ async function runQuery(event) {
     renderWarnings(res.warnings);
     renderTimings(res.timings_ms);
     renderCitations(res.citations || []);
-    switchTab("answer");
   } catch (e) {
     el.answerOutput.textContent = e.message;
     el.cacheStatus.hidden = true;
@@ -354,7 +358,7 @@ function renderCitations(citations) {
   state.selectedCitation = null;
   el.citationCount.textContent = String(citations.length);
   el.citationList.innerHTML = "";
-  el.sourceDetail.textContent = "Select a citation to inspect its lineage.";
+  el.sourceDetail.innerHTML = "Select a citation to inspect its lineage.";
   el.sourceDetail.className = "source-detail empty";
   clearOverlay();
   if (!citations.length) {
@@ -394,18 +398,31 @@ async function copyCitation() {
   setTimeout(() => { el.copyCitationButton.textContent = "Copy JSON"; }, 1200);
 }
 
+function setQueryEnabled(enabled) {
+  el.queryInput.disabled = !enabled;
+  el.askButton.disabled = !enabled;
+  el.queryForm.classList.toggle("disabled", !enabled);
+  if (!enabled) {
+    el.queryInput.placeholder = "Upload a document first to start querying...";
+  } else {
+    el.queryInput.placeholder = "Ask a question about your documents...";
+  }
+}
+
 async function loadDocuments() {
   if (!state.apiKey) {
     el.docsList.innerHTML = '<span class="text-dim">Sign in to see documents.</span>';
     el.docsList.classList.add("empty");
-    return;
+    return [];
   }
   try {
     const docs = await requestJson("/documents", { headers: getAuthHeaders() });
     renderDocuments(docs);
+    return docs;
   } catch (e) {
     el.docsList.innerHTML = `<span class="text-dim">${escapeHtml(e.message)}</span>`;
     el.docsList.classList.add("empty");
+    return [];
   }
 }
 
@@ -452,6 +469,7 @@ async function loadPdf(file) {
   state.pdfDoc = await lib.getDocument({ data: bytes }).promise;
   state.pageCount = state.pdfDoc.numPages;
   state.currentPage = 1;
+  el.pdfMessage.hidden = true;
   await renderPage(1);
 }
 
@@ -462,16 +480,16 @@ async function getPdfJs() {
 
 async function renderPage(pageNumber, citation = state.selectedCitation) {
   if (!state.pdfDoc) {
-    el.pdfMessage.textContent = "Upload a PDF to preview it here.";
+    el.pdfMessage.hidden = false;
     el.pdfViewport.hidden = true;
     return;
   }
   const pg = Math.min(Math.max(Number(pageNumber) || 1, 1), state.pageCount);
   state.currentPage = pg;
   const page = await state.pdfDoc.getPage(pg);
-  const cw = el.pdfViewport.parentElement.clientWidth - 24;
+  const cw = el.pdfViewport.parentElement.clientWidth - 44;
   const nv = page.getViewport({ scale: 1 });
-  const scale = Math.min(1.6, Math.max(0.7, cw / nv.width));
+  const scale = Math.min(1.6, Math.max(0.5, cw / nv.width));
   const vp = page.getViewport({ scale });
   const ctx = el.pdfCanvas.getContext("2d");
   el.pdfCanvas.width = Math.floor(vp.width);
@@ -483,7 +501,7 @@ async function renderPage(pageNumber, citation = state.selectedCitation) {
   el.overlayLayer.style.width = `${Math.floor(vp.width)}px`;
   el.overlayLayer.style.height = `${Math.floor(vp.height)}px`;
   el.pdfViewport.hidden = false;
-  el.pdfMessage.textContent = "";
+  el.pdfMessage.hidden = true;
   el.pageIndicator.textContent = `${pg} / ${state.pageCount}`;
   el.prevPageButton.disabled = pg <= 1;
   el.nextPageButton.disabled = pg >= state.pageCount;
@@ -497,10 +515,9 @@ function drawOverlay(citation, pm) {
   clearOverlay();
   const bbox = citation?.bbox || [];
   if (Number(citation?.page) !== state.currentPage) return;
-  if (!bbox.length) { el.pdfMessage.textContent = "No bbox for this citation."; return; }
+  if (!bbox.length) return;
   const norm = normalizeBbox(bbox, pm);
-  if (!norm.length) { el.pdfMessage.textContent = "Bbox cannot be mapped to page."; return; }
-  el.pdfMessage.textContent = "";
+  if (!norm.length) return;
   if (norm.length === 4) {
     const [x0, y0, x1, y1] = norm;
     const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");

@@ -15,7 +15,7 @@
   <div id="loginView" class="login-view">
     <div class="login-left">
       <div class="login-left-content">
-        <div class="login-eyebrow">RAG Hackathon 2026</div>
+        <div class="login-eyebrow">LineageRAG</div>
         <h1 class="login-headline">Trace every answer<br /><em>back to the source.</em></h1>
         <p class="login-body">Upload documents. Ask questions. Every response comes with full lineage &mdash; page number, section path, bounding box, and the exact chunk text that grounded the answer.</p>
         <div class="login-features">
@@ -83,7 +83,6 @@
     <div class="toolbar">
       <div class="toolbar-left">
         <button id="tabAnswer" type="button" class="tab active" data-tab="answer">Answer</button>
-        <button id="tabSources" type="button" class="tab" data-tab="sources">Sources</button>
         <button id="tabDocuments" type="button" class="tab" data-tab="documents">Documents</button>
       </div>
       <div class="toolbar-right">
@@ -93,48 +92,66 @@
 
     <main class="content">
       <section id="paneAnswer" class="pane active">
-        <div class="answer-header">
-          <h2 class="pane-heading">Answer</h2>
-          <div class="answer-badges">
-            <span id="cacheStatus" class="badge badge-green" hidden>Cache</span>
-            <span id="requestMeta" class="text-dim text-xs"></span>
-          </div>
-        </div>
-        <div id="answerOutput" class="answer-body empty">Ask a question in the command bar above to get a grounded answer.</div>
-        <div id="warningOutput" class="warnings"></div>
-        <div id="timingOutput" class="timings"></div>
-
-        <div class="citations-section">
-          <div class="citations-header">
-            <h3 class="pane-heading">Citations <span id="citationCount" class="count-badge">0</span></h3>
-          </div>
-          <div id="citationList" class="citation-list empty">Citations will appear after you ask a question.</div>
-        </div>
-
-        <div class="detail-section">
-          <div class="detail-header">
-            <h3 class="pane-heading">Source detail</h3>
-            <button id="copyCitationButton" type="button" class="btn btn-text btn-2xs">Copy JSON</button>
-          </div>
-          <div id="sourceDetail" class="source-detail empty">Select a citation to inspect its lineage.</div>
-        </div>
-      </section>
-
-      <section id="paneSources" class="pane">
-        <div class="sources-layout">
-          <div class="pdf-col">
-            <div class="pdf-toolbar">
-              <h3 class="pane-heading">PDF Preview</h3>
-              <div class="pdf-nav">
-                <button id="prevPageButton" type="button" class="btn btn-text btn-2xs" aria-label="Previous page">&larr;</button>
-                <span id="pageIndicator" class="text-dim text-xs mono">- / -</span>
-                <button id="nextPageButton" type="button" class="btn btn-text btn-2xs" aria-label="Next page">&rarr;</button>
+        <div class="answer-layout">
+          <div class="answer-col">
+            <div class="answer-card">
+              <div class="answer-card-header">
+                <div class="answer-icon">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 3h14M2 9h14M2 15h10"/></svg>
+                </div>
+                <div>
+                  <h2 class="answer-card-title">Response</h2>
+                  <div class="answer-card-meta">
+                    <span id="cacheStatus" class="badge badge-green" hidden>Cache</span>
+                    <span id="requestMeta" class="text-dim text-xs"></span>
+                  </div>
+                </div>
               </div>
+              <div id="answerOutput" class="answer-body empty">Ask a question in the command bar above to get a grounded answer.</div>
+              <div id="warningOutput" class="warnings"></div>
+              <div id="timingOutput" class="timings"></div>
             </div>
-            <div id="pdfMessage" class="text-dim text-sm">Upload a PDF to preview it here.</div>
-            <div id="pdfViewport" class="pdf-viewport" hidden>
-              <canvas id="pdfCanvas"></canvas>
-              <svg id="overlayLayer" class="overlay-layer" aria-hidden="true"></svg>
+
+            <div class="citations-card">
+              <div class="citations-header">
+                <div class="citations-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M6 8h7"/></svg>
+                </div>
+                <h3 class="citations-title">Citations <span id="citationCount" class="count-badge">0</span></h3>
+                <button id="copyCitationButton" type="button" class="btn btn-text btn-2xs" style="margin-left:auto">Copy JSON</button>
+              </div>
+              <div id="citationList" class="citation-list empty">Citations will appear after you ask a question.</div>
+            </div>
+
+            <div class="detail-card">
+              <div class="detail-header">
+                <h3 class="detail-title">Source lineage</h3>
+              </div>
+              <div id="sourceDetail" class="source-detail empty">Select a citation to inspect its lineage.</div>
+            </div>
+          </div>
+
+          <div class="pdf-col">
+            <div class="pdf-card">
+              <div class="pdf-card-header">
+                <div class="pdf-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 1h5l4 4v9a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z"/><path d="M9 1v4h4"/></svg>
+                </div>
+                <span class="pdf-card-title">Document preview</span>
+                <div class="pdf-nav">
+                  <button id="prevPageButton" type="button" class="btn btn-text btn-2xs" aria-label="Previous page">&larr;</button>
+                  <span id="pageIndicator" class="text-dim text-xs mono">- / -</span>
+                  <button id="nextPageButton" type="button" class="btn btn-text btn-2xs" aria-label="Next page">&rarr;</button>
+                </div>
+              </div>
+              <div id="pdfMessage" class="pdf-empty">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity=".3"><path d="M8 2h10l8 8v18a2 2 0 01-2 2H8a2 2 0 01-2-2V4a2 2 0 012-2z"/><path d="M18 2v8h8"/></svg>
+                <span>Upload a PDF to see the document with citation highlights</span>
+              </div>
+              <div id="pdfViewport" class="pdf-viewport" hidden>
+                <canvas id="pdfCanvas"></canvas>
+                <svg id="overlayLayer" class="overlay-layer" aria-hidden="true"></svg>
+              </div>
             </div>
           </div>
         </div>
